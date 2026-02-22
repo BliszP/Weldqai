@@ -1,0 +1,1 @@
+Imperfections & quality levels.

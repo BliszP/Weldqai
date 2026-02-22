@@ -1,0 +1,104 @@
+# .github/workflows/ci.yml
+# WeldQAi CI — runs on every push and pull-request to main/develop.
+#
+# Required GitHub Secrets (Settings → Secrets and variables → Actions):
+#   FIREBASE_OPTIONS_DART   — full content of lib/firebase_options.dart
+#   GOOGLE_SERVICES_JSON    — full content of android/app/google-services.json
+#   FIREBASE_WEB_CONFIG_JS  — full content of web/firebase-config.js
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # ─── Lint + analyse + test ────────────────────────────────────────────────
+  test:
+    name: Analyse & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.8'   # exact match to local — ships with Dart 3.8.1 (pubspec requires ^3.8.1)
+          channel: stable
+          cache: true
+
+      - name: Write Firebase config files
+        env:
+          FIREBASE_OPTIONS_DART:  ${{ secrets.FIREBASE_OPTIONS_DART }}
+          GOOGLE_SERVICES_JSON:   ${{ secrets.GOOGLE_SERVICES_JSON }}
+          FIREBASE_WEB_CONFIG_JS: ${{ secrets.FIREBASE_WEB_CONFIG_JS }}
+        run: |
+          printf '%s' "$FIREBASE_OPTIONS_DART"  > lib/firebase_options.dart
+          printf '%s' "$GOOGLE_SERVICES_JSON"   > android/app/google-services.json
+          printf '%s' "$FIREBASE_WEB_CONFIG_JS" > web/firebase-config.js
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyse
+        run: flutter analyze --fatal-warnings
+
+      - name: Run tests with coverage
+        run: flutter test --coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage/lcov.info
+          flags: unit
+          fail_ci_if_error: false   # don't break CI on Codecov outages
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # ─── Build verification ───────────────────────────────────────────────────
+  build-android:
+    name: Build Android (debug)
+    runs-on: ubuntu-latest
+    needs: test   # only build if tests pass
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.8'
+          channel: stable
+          cache: true
+
+      - name: Write Firebase config files
+        env:
+          FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
+          GOOGLE_SERVICES_JSON:  ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          printf '%s' "$FIREBASE_OPTIONS_DART" > lib/firebase_options.dart
+          printf '%s' "$GOOGLE_SERVICES_JSON"  > android/app/google-services.json
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK (debug)
+        run: flutter build apk --debug --dart-define=SENTRY_DSN=""
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7

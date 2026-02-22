@@ -1,0 +1,14 @@
+# android/key.properties
+# Copy this file to android/key.properties (gitignored) and fill in real values.
+# NEVER commit key.properties — it contains your signing credentials.
+#
+# How to generate a keystore:
+#   keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 \
+#     -validity 10000 -alias upload
+#
+# Store upload-keystore.jks in android/app/ (also gitignored).
+
+storePassword=your-keystore-password
+keyPassword=your-key-password
+keyAlias=upload
+storeFile=../app/upload-keystore.jks

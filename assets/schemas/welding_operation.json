@@ -1,0 +1,85 @@
+{
+  "title": "Welding Operation Report",
+  "standard": [
+    "AWS D1.1",
+    "ASME IX",
+    "ISO 3834"
+  ],
+"standards": {
+    "AWS D1.1": {
+      "details": [
+        { "key": "acceptance_ref", "label": "Acceptance Ref", "type": "static", "value": "AWS D1.1 (Production acceptance)" }
+      ]
+    },
+    "ASME IX": {
+      "details": [
+        { "key": "p_number", "label": "Base Metal P-Number (QW-422)", "type": "text" },
+        { "key": "f_number", "label": "Filler F-Number (QW-432)", "type": "text" },
+        { "key": "a_number", "label": "A-Number (Chemistry)", "type": "text" }
+      ]
+    },
+    "ISO 3834": {
+      "details": [
+        { "key": "quality_requirements", "label": "Quality Requirements", "type": "choice", "choices": ["Part 2", "Part 3", "Part 4"] }
+      ]
+    }
+  },
+
+  "details": [
+    { "key": "project_name", "label": "Project", "shared": true },
+    { "key": "client", "label": "Client", "shared": true },
+    { "key": "location", "label": "Location", "shared": true },
+    { "key": "document_no", "label": "Document No.", "shared": true },
+    { "key": "date", "label": "Date", "type": "date", "shared": true },
+    { "key": "shift", "label": "Shift", "type": "dropdown", "options": ["Day", "Night"], "shared": true },
+    { "key": "joint_id", "label": "Joint ID" },
+    { "key": "line_no", "label": "Line No." },
+    { "key": "isometric", "label": "Isometric" },
+    { "key": "drawing", "label": "Drawing No." },
+    { "key": "wps_no", "label": "WPS No.", "shared": true },
+    { "key": "pqr_no", "label": "PQR No." },
+    { "key": "process", "label": "Process", "type": "choice", "choices": ["SMAW", "GTAW", "GMAW", "FCAW", "SAW", "Other"] },
+    { "key": "welder_id", "label": "Welder ID", "shared": true },
+    { "key": "fitup_by", "label": "Fit-up by" },
+    { "key": "inspected_by", "label": "Fit-up Inspector" },
+    { "key": "base_material", "label": "Base Material" },
+    { "key": "joint_type", "label": "Joint Type", "type": "choice", "choices": ["BW-Groove", "BW-Bevel", "BW-V", "BW-U", "BW-J", "FW-Fillet", "Other"] },
+    { "key": "position", "label": "Position", "type": "choice", "choices": ["1G", "2G", "3G", "4G", "5G", "6G", "1F", "2F", "3F", "4F"] },
+    { "key": "thickness_mm", "label": "Thickness (mm)", "type": "number" },
+    { "key": "outer_dia_mm", "label": "Outer Diameter (mm)", "type": "number" },
+    { "key": "root_gap_mm", "label": "Root Gap (mm)", "type": "number" },
+    { "key": "bevel_angle_deg", "label": "Bevel Angle (°)", "type": "number" },
+    { "key": "preheat_req", "label": "Preheat Required", "type": "choice", "choices": ["Yes", "No"] },
+    { "key": "preheat_temp_c", "label": "Preheat Temp (°C)", "type": "number" },
+    { "key": "interpass_limit_c", "label": "Interpass Limit (°C)", "type": "number" },
+    { "key": "gas_type", "label": "Shielding Gas", "type": "text" },
+    { "key": "gas_flow_lpm", "label": "Gas Flow (L/min)", "type": "number" },
+    { "key": "electrode_class", "label": "Electrode/Class", "type": "text" },
+    { "key": "electrode_batch", "label": "Consumable Batch/Heat No.", "type": "text" },
+    { "key": "pwht_req", "label": "PWHT Required", "type": "choice", "choices": ["Yes", "No"] },
+    { "key": "remarks", "label": "Remarks" }
+  ],
+  "tables": [
+    {
+      "key": "passes",
+      "label": "Passes",
+      "minRows": 1,
+      "columns": [
+        { "key": "pass", "label": "Pass", "type": "choice", "choices": ["ROOT", "HOT PASS", "FILL", "CAP", "OTHER"], "width": 120 },
+        { "key": "time_start", "label": "Time Start", "type": "time", "width": 110 },
+        { "key": "time_stop", "label": "Time Stop", "type": "time", "width": 110 },
+        { "key": "interpass_temp_c", "label": "Interpass Temp. (°C)", "type": "number", "width": 150 },
+        { "key": "polarity", "label": "Polarity", "type": "text", "width": 110 },
+        { "key": "direction", "label": "Direction", "type": "text", "width": 110 },
+        { "key": "arc_volts", "label": "Arc (Volts)", "type": "number", "width": 110 },
+        { "key": "current_amps", "label": "Current (Amps)", "type": "number", "width": 130 },
+        { "key": "electrode_type", "label": "Electrode Type", "type": "text", "width": 140 },
+        { "key": "electrode_size_mm", "label": "Electrode Size (mm)", "type": "number", "width": 150 },
+        { "key": "arc_time_min", "label": "Arc Time (min)", "type": "number", "width": 130 },
+        { "key": "runout_length_mm", "label": "Run-out Length (mm)", "type": "number", "width": 170 },
+        { "key": "travel_speed_mm_min", "label": "Travel Speed (mm/min)", "type": "computed", "formula": "runout_length_mm/arc_time_min", "width": 170 },
+        { "key": "heat_input_kj_mm", "label": "Heat Input (kJ/mm)", "type": "computed", "formula": "(arc_volts*current_amps*60)/(travel_speed_mm_min*1000)", "width": 180 }
+      ]
+    }
+  ]
+}

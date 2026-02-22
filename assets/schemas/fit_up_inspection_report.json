@@ -1,0 +1,41 @@
+{
+  "title": "Fit-Up Inspection Report",
+  "standard": [
+    "AWS D1.1",
+    "ASME IX",
+    "ISO 17637"
+  ],
+  "standards": {
+    "AWS D1.1": { "details": [ { "key": "fitup_ref", "label": "Fit-up Ref", "type": "static", "value": "AWS D1.1 (fit-up/assembly)" } ] },
+    "ASME IX": { "details": [ { "key": "fitup_ref", "label": "Fit-up Ref", "type": "static", "value": "Per construction code (e.g., B31.3)" } ] },
+    "ISO 17637": { "details": [ { "key": "quality_level", "label": "ISO 5817 Quality Level", "type": "choice", "choices": ["B", "C", "D"] } ] }
+  },
+  "details": [
+    { "key": "project_name", "label": "Project", "shared": true },
+    { "key": "client", "label": "Client", "shared": true },
+    { "key": "document_no", "label": "Document No.", "shared": true },
+    { "key": "date", "label": "Date", "type": "date", "shared": true },
+    { "key": "inspector", "label": "Inspector", "shared": true },
+    { "key": "line_no", "label": "Line/Member No.", "type": "text" },
+    { "key": "joint_id", "label": "Joint/Location ID", "type": "text" },
+    { "key": "wps_no", "label": "WPS No.", "shared": true },
+    { "key": "joint_type", "label": "Joint Type", "type": "choice", "choices": ["BW-Groove", "BW-V", "BW-U", "BW-J", "FW-Fillet", "Other"] },
+    { "key": "position", "label": "Position", "type": "choice", "choices": ["1G", "2G", "3G", "4G", "5G", "6G", "1F", "2F", "3F", "4F"] },
+    { "key": "remarks", "label": "Remarks" }
+  ],
+  "tables": [
+    {
+      "key": "checks",
+      "label": "Fit-Up Checks",
+      "minRows": 3,
+      "columns": [
+        { "key": "parameter", "label": "Parameter", "type": "choice", "choices": ["Alignment", "Root Gap", "Bevel Angle", "Face/Root Land", "Cleanliness", "Tack Quality", "Hi-Lo"], "width": 160 },
+        { "key": "requirement", "label": "Requirement", "type": "text", "width": 160 },
+        { "key": "measured", "label": "Measured", "type": "text", "width": 120 },
+        { "key": "status", "label": "Status", "type": "choice", "choices": ["OK", "NOK"], "width": 90 },
+        { "key": "comments", "label": "Comments", "type": "text", "width": 200 }
+      ]
+    }
+  ]
+}
+  

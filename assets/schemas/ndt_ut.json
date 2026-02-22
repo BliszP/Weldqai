@@ -1,0 +1,46 @@
+{
+  "title": "NDT Report - Ultrasonic Testing",
+  "standard": [
+    "ISO 17640",
+    "ASME V"
+  ],
+"standards": {
+    "ISO 17640": {
+      "details": [
+        { "key": "acceptance_ref", "label": "Acceptance (ISO 11666)", "type": "static", "value": "AL 2 / AL 3" },
+        { "key": "acceptance_level", "label": "Acceptance Level", "type": "choice", "choices": ["AL 2", "AL 3"] }
+      ]
+    },
+    "ASME V": {
+      "details": [
+        { "key": "acceptance_ref", "label": "Acceptance (to construction code)", "type": "static", "value": "Typically per ASME B31.3" },
+        { "key": "service_category", "label": "Service Category", "type": "choice", "choices": ["Normal", "Category M", "High Pressure"] }
+      ]
+    }
+  },
+
+  "details": [
+    { "key": "project_name", "label": "Project", "shared": true },
+    { "key": "document_no", "label": "Document No.", "shared": true },
+    { "key": "date", "label": "Date", "type": "date", "shared": true },
+    { "key": "operator", "label": "UT Operator", "shared": true },
+    { "key": "joint_id", "label": "Joint ID" },
+    { "key": "probe_angle_deg", "label": "Probe Angle (°)", "type": "number" },
+    { "key": "frequency_mhz", "label": "Frequency (MHz)", "type": "number" },
+    { "key": "dac_tvg", "label": "DAC/TVG", "type": "text" }
+  ],
+  "tables": [
+    {
+      "key": "indications",
+      "label": "Indications",
+      "minRows": 3,
+      "columns": [
+        { "key": "scan_pos", "label": "Scan Pos.", "type": "text", "width": 100 },
+        { "key": "depth_mm", "label": "Depth (mm)", "type": "number", "width": 110 },
+        { "key": "length_mm", "label": "Length (mm)", "type": "number", "width": 110 },
+        { "key": "amp_db", "label": "Amplitude (dB)", "type": "number", "width": 120 },
+        { "key": "result", "label": "Result", "type": "choice", "choices": ["Accept", "Repair"], "width": 100 }
+      ]
+    }
+  ]
+}

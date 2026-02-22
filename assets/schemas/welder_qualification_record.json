@@ -1,0 +1,57 @@
+{
+  "title": "Welder Qualification Record (WQR)",
+  "standard": [
+    "AWS D1.1",
+    "ASME IX",
+    "ISO 9606"
+  ],
+  "standards": {
+    "AWS D1.1": {
+      "details": [
+        { "key": "d1_1_group", "label": "AWS Grouping (D1.1)", "type": "text" }
+      ]
+    },
+    "ASME IX": {
+      "details": [
+        { "key": "p_number_range", "label": "Qualified P-Number Range", "type": "text" },
+        { "key": "f_number_used", "label": "F-Number Used", "type": "text" }
+      ]
+    },
+    "ISO 9606": {
+      "details": [
+        { "key": "product_type", "label": "Product Type", "type": "choice", "choices": ["Plate", "Pipe"] }
+      ]
+    }
+  },
+
+  "details": [
+    { "key": "project_name", "label": "Project", "shared": true },
+    { "key": "client", "label": "Client", "shared": true },
+    { "key": "document_no", "label": "Document No.", "shared": true },
+    { "key": "date", "label": "Date", "type": "date", "shared": true },
+    { "key": "contractor", "label": "Contractor", "shared": true },
+    { "key": "qa_representative", "label": "QA Representative", "shared": true },
+    { "key": "remarks", "label": "Remarks" }
+  ],
+  "tables": [
+    {
+      "key": "welders",
+      "label": "Welder Qualifications",
+      "minRows": 3,
+      "columns": [
+        { "key": "welder_id", "label": "Welder ID", "type": "text", "width": 120 },
+        { "key": "name", "label": "Name", "type": "text", "width": 160 },
+        { "key": "process", "label": "Process", "type": "choice", "choices": ["SMAW", "GTAW", "GMAW", "FCAW", "SAW", "Other"], "width": 120 },
+        { "key": "position_range", "label": "Qualified Positions", "type": "text", "width": 170 },
+        { "key": "thickness_range_mm", "label": "Thickness Range (mm)", "type": "text", "width": 160 },
+        { "key": "diameter_range_mm", "label": "Diameter Range (mm)", "type": "text", "width": 160 },
+        { "key": "materials", "label": "Base Materials", "type": "text", "width": 160 },
+        { "key": "wps_no", "label": "WPS No.", "type": "text", "width": 140 },
+        { "key": "pqr_no", "label": "PQR No.", "type": "text", "width": 140 },
+        { "key": "issued_on", "label": "Issued On", "type": "date", "width": 130 },
+        { "key": "expires_on", "label": "Expires On", "type": "date", "width": 130 },
+        { "key": "status", "label": "Status", "type": "choice", "choices": ["Active", "Expired", "Suspended"], "width": 120 }
+      ]
+    }
+  ]
+}

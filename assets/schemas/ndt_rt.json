@@ -1,0 +1,48 @@
+{
+  "title": "NDT Report - Radiography",
+  "standard": [
+    "ISO 17636",
+    "ASME V"
+  ],
+  "standards": {
+    "ISO 17636": {
+      "details": [
+        { "key": "acceptance_ref", "label": "Acceptance (ISO 10675-1)", "type": "static", "value": "Class 1 / 2 / 3" },
+        { "key": "rt_acceptance_class", "label": "RT Acceptance Class", "type": "choice", "choices": ["Class 1", "Class 2", "Class 3"] }
+      ]
+    },
+    "ASME V": {
+      "details": [
+        { "key": "acceptance_ref", "label": "Acceptance (to construction code)", "type": "static", "value": "Typically per ASME B31.3" },
+        { "key": "joint_category", "label": "Joint Category", "type": "choice", "choices": ["Normal Fluid", "Category M", "High Pressure"] }
+      ]
+    }
+  },
+
+  "details": [
+    { "key": "project_name", "label": "Project", "shared": true },
+    { "key": "document_no", "label": "Document No.", "shared": true },
+    { "key": "date", "label": "Date", "type": "date", "shared": true },
+    { "key": "inspector", "label": "RT Operator", "shared": true },
+    { "key": "joint_id", "label": "Joint ID" },
+    { "key": "source", "label": "Source", "type": "choice", "choices": ["Ir-192", "Co-60", "X-Ray"] },
+    { "key": "sfd_mm", "label": "SFD (mm)", "type": "number" },
+    { "key": "exposure_time_s", "label": "Exposure Time (s)", "type": "number" },
+    { "key": "film_class", "label": "Film/Detector Class", "type": "text" },
+    { "key": "iqi_sensitivity", "label": "IQI Sensitivity", "type": "text" }
+  ],
+  "tables": [
+    {
+      "key": "indications",
+      "label": "Indications",
+      "minRows": 3,
+      "columns": [
+        { "key": "ref", "label": "Ref", "type": "text", "width": 80 },
+        { "key": "location", "label": "Location", "type": "text", "width": 120 },
+        { "key": "type", "label": "Type", "type": "choice", "choices": ["Porosity", "Slag", "Lack of Fusion", "Crack", "Other"], "width": 160 },
+        { "key": "length_mm", "label": "Length (mm)", "type": "number", "width": 110 },
+        { "key": "result", "label": "Result", "type": "choice", "choices": ["Accept", "Repair"], "width": 100 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "title": "Structural Fillet Weld Report",
+  "standard": [
+    "AWS D1.1",
+    "ISO 3834"
+  ],
+"standards": {
+    "AWS D1.1": {
+      "details": [
+        { "key": "acceptance_ref", "label": "Acceptance Ref", "type": "static", "value": "AWS D1.1 (fillet weld acceptance)" }
+      ]
+    },
+    "ISO 3834": {
+      "details": [
+        { "key": "quality_requirements", "label": "Quality Requirements", "type": "choice", "choices": ["Part 2", "Part 3", "Part 4"] }
+      ]
+    }
+  },
+
+  "details": [
+    { "key": "project_name", "label": "Project", "shared": true },
+    { "key": "client", "label": "Client", "shared": true },
+    { "key": "location", "label": "Location", "shared": true },
+    { "key": "document_no", "label": "Document No.", "shared": true },
+    { "key": "date", "label": "Date", "type": "date", "shared": true },
+    { "key": "shift", "label": "Shift", "type": "dropdown", "options": ["Day", "Night"], "shared": true },
+    { "key": "assembly", "label": "Assembly/Member ID" },
+    { "key": "wps_no", "label": "WPS No.", "shared": true },
+    { "key": "welder_id", "label": "Welder ID", "shared": true },
+    { "key": "process", "label": "Process", "type": "choice", "choices": ["SMAW", "GMAW", "FCAW", "GTAW", "SAW", "Other"] },
+    { "key": "steel_grade", "label": "Steel Grade" },
+    { "key": "position", "label": "Position", "type": "choice", "choices": ["1F", "2F", "3F", "4F"] },
+    { "key": "preheat_temp_c", "label": "Preheat Temp (°C)", "type": "number" },
+    { "key": "interpass_limit_c", "label": "Interpass Limit (°C)", "type": "number" },
+    { "key": "remarks", "label": "Remarks" }
+  ],
+  "tables": [
+    {
+      "key": "segments",
+      "label": "Fillet Segments",
+      "minRows": 1,
+      "columns": [
+        { "key": "segment_id", "label": "Segment ID", "type": "text", "width": 120 },
+        { "key": "leg_size_mm", "label": "Leg Size (mm)", "type": "number", "width": 120 },
+        { "key": "length_mm", "label": "Length (mm)", "type": "number", "width": 120 },
+        { "key": "passes_count", "label": "Passes", "type": "number", "width": 90 },
+        { "key": "arc_volts", "label": "Volts", "type": "number", "width": 90 },
+        { "key": "current_amps", "label": "Amps", "type": "number", "width": 90 },
+        { "key": "travel_speed_mm_min", "label": "Travel (mm/min)", "type": "number", "width": 130 },
+        { "key": "heat_input_kj_mm", "label": "Heat Input (kJ/mm)", "type": "computed", "formula": "(arc_volts*current_amps*60)/(travel_speed_mm_min*1000)", "width": 160 },
+        { "key": "visual_ok", "label": "Visual OK", "type": "choice", "choices": ["Yes", "No"], "width": 100 }
+      ]
+    }
+  ]
+}

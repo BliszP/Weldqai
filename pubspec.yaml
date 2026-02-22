@@ -1,0 +1,116 @@
+# WeldQAi — pubspec.yaml
+# Last cleaned: 2026-02-21
+# Active dependencies only — dead packages removed 2026-02-21
+# Removed: charts_flutter (discontinued), pie_chart (redundant), js (superseded by package:web), shared_preferences_web (redundant)
+
+name: weldqai_app
+description: "#1 QA/QC Platform."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+    sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+
+  # Firebase
+  firebase_core: ^3.15.2
+  firebase_auth: ^5.7.0
+  cloud_firestore: ^5.6.12
+  firebase_storage: ^12.1.3
+  firebase_app_check: ^0.3.0
+  firebase_analytics: ^11.6.0
+  firebase_performance: ^0.10.0+8
+  firebase_messaging: ^15.2.10
+  cloud_functions: ^5.1.5
+
+  # Payments
+  url_launcher: ^6.3.0
+
+  # UI
+  provider: ^6.0.5
+  fl_chart: ^0.66.0
+  font_awesome_flutter: ^10.7.0
+  cupertino_icons: ^1.0.8
+  flutter_local_notifications: ^17.2.1
+  flutter_html: ^3.0.0
+
+  # Export (PDF + Excel)
+  pdf: ^3.11.0
+  printing: ^5.13.0
+  excel: ^2.1.0
+  file_saver: ^0.3.1
+  open_filex: ^4.4.1
+
+  # Templates & File Handling
+  syncfusion_flutter_pdf: ^21.2.4
+  file_picker: ^8.0.3
+  path_provider: ^2.1.4
+  flutter_cache_manager: ^3.3.1
+
+  # Camera & OCR
+  mobile_scanner: ^5.2.3
+  image_picker: ^1.1.2
+  image_picker_for_web: ^3.0.2
+  google_mlkit_text_recognition: ^0.13.0
+
+  # Auth
+  google_sign_in: ^6.1.3
+
+  # Logging & Error Tracking
+  logger: ^2.4.0
+  sentry_flutter: ^8.9.0
+
+  # Storage & Utilities
+  shared_preferences: ^2.2.3
+  uuid: ^4.5.1
+  http: ^1.2.2
+  mime: ^1.0.0
+  rxdart: ^0.27.7
+  intl: ^0.17.0
+  math_expressions: ^2.2.0
+  web: ^1.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  mockito: ^5.4.4
+  build_runner: ^2.4.13
+  fake_cloud_firestore: ^3.0.2
+  firebase_auth_mocks: ^0.14.1
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
+
+  assets:
+      - assets/logo3.png
+      - assets/templates/
+      - assets/schemas/
+      - assets/schemas/wps_pqr_register.json
+      - assets/schemas/welder_qualification_record.json
+      - assets/schemas/pwht_record.json
+      - assets/schemas/fit_up_inspection_report.json
+      - assets/schemas/custom_template_example.json
+      - assets/schemas/welding_operation.json
+      - assets/schemas/structural_fillet.json
+      - assets/schemas/visual_inspection.json
+      - assets/schemas/ndt_rt.json
+      - assets/schemas/ndt_ut.json
+      - assets/schemas/ndt_mpi.json
+      - assets/schemas/hydrotest.json
+      - assets/schemas/coating_painting.json
+      - assets/schemas/anode_installation.json
+      - assets/schemas/pipe_tally_log.json
+      - assets/schemas/repairs_log.json
+      - assets/standards/
+      - assets/images/
+      - assets/icons/

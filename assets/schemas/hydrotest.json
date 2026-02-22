@@ -1,0 +1,45 @@
+{
+  "title": "Hydrostatic Test Report",
+  "standard": [ "ASME B31.3", "API 1110" ],
+  "standards": {
+    "ASME B31.3": {
+      "details": [
+        { "key": "test_type", "label": "Test Type", "type": "choice", "choices": ["Hydrostatic Strength", "Leak Test"] },
+        { "key": "code_ref", "label": "Code Ref", "type": "static", "value": "ASME B31.3 §345" }
+      ]
+    },
+    "API 1110": {
+      "details": [
+        { "key": "test_type", "label": "Test Type", "type": "choice", "choices": ["Strength", "Leak", "Combined"] },
+        { "key": "code_ref", "label": "Code Ref", "type": "static", "value": "API 1110 Pressure Testing of Steel Pipelines" }
+      ]
+    }
+  },
+
+  "details": [
+    { "key": "project_name", "label": "Project", "shared": true },
+    { "key": "document_no", "label": "Document No.", "shared": true },
+    { "key": "date", "label": "Date", "type": "date", "shared": true },
+    { "key": "system", "label": "System/Line" },
+    { "key": "test_medium", "label": "Test Medium", "type": "choice", "choices": ["Water", "Treated Water", "Other"] },
+    { "key": "test_pressure_bar", "label": "Test Pressure (bar)", "type": "number" },
+    { "key": "hold_time_min", "label": "Hold Time (min)", "type": "number" },
+    { "key": "temperature_c", "label": "Ambient Temp (°C)", "type": "number" },
+    { "key": "inspector", "label": "Inspector", "shared": true },
+    { "key": "remarks", "label": "Remarks" }
+  ],
+  "tables": [
+    {
+      "key": "readings",
+      "label": "Readings",
+      "minRows": 3,
+      "columns": [
+        { "key": "time", "label": "Time", "type": "time", "width": 110 },
+        { "key": "pressure_bar", "label": "Pressure (bar)", "type": "number", "width": 130 },
+        { "key": "temp_c", "label": "Temp (°C)", "type": "number", "width": 120 },
+        { "key": "leak_observed", "label": "Leak Observed", "type": "choice", "choices": ["No", "Yes"], "width": 130 }
+      ]
+    }
+  ]
+
+}

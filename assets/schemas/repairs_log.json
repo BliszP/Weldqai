@@ -1,0 +1,67 @@
+{
+  "id": "repairs_log",
+  "title": "Repairs Log",
+  "version": 2,
+  "standard": [
+    "AWS D1.1",
+    "ASME IX",
+    "ISO 5817",
+    "Project Spec"
+  ],
+  
+  "standards": {
+    "AWS D1.1": { "details": [ { "key": "acceptance_ref", "label": "Acceptance Ref", "type": "static", "value": "AWS D1.1" } ] },
+    "ASME IX": { "details": [ { "key": "acceptance_ref", "label": "Acceptance Ref", "type": "static", "value": "Refer construction code (e.g., B31.3)" } ] },
+    "ISO 5817": { "details": [ { "key": "quality_level", "label": "Quality Level", "type": "choice", "choices": ["B", "C", "D"] } ] },
+    "Project Spec": { "details": [ { "key": "spec_ref", "label": "Spec Reference", "type": "text" } ] }
+  },
+
+  "details": [
+    { "key": "document_no", "label": "Document No.", "required": true },
+    { "key": "date", "label": "Date", "type": "date", "required": true },
+    { "key": "shift", "label": "Shift", "type": "dropdown", "options": ["Day", "Night"] },
+    { "key": "project", "label": "Project" },
+    { "key": "client", "label": "Client" },
+    { "key": "location", "label": "Location" },
+    { "key": "worksite", "label": "Worksite" },
+    { "key": "equipment_id", "label": "Equipment ID" },
+    { "key": "weld_no", "label": "Weld No." },
+    { "key": "wps_no", "label": "WPS No." },
+    { "key": "welder_id", "label": "Welder ID" },
+    { "key": "inspector", "label": "Inspector" },
+    { "key": "supervisor", "label": "Supervisor" },
+    { "key": "ndt_method", "label": "NDT Method", "type": "dropdown", "options": ["VT", "MT", "PT", "UT", "RT"] },
+    { "key": "joint_type", "label": "Joint Type", "type": "dropdown", "options": ["BW", "FW", "T-Joint", "Socket", "Other"] },
+    { "key": "material", "label": "Material" },
+    { "key": "thickness_mm", "label": "Thickness (mm)", "type": "number" },
+    { "key": "repair_reason", "label": "Repair Reason", "type": "dropdown", "options": ["Porosity", "Slag", "Lack of Fusion", "Undercut", "Crack", "Other"] }
+  ],
+  "tables": [
+    {
+      "label": "Entries",
+      "key": "entries",
+      "columns": [
+        { "key": "pass_no", "label": "Pass No.", "type": "number", "width": 120, "required": true },
+        { "key": "weld_location", "label": "Weld Location", "type": "text", "width": 200 },
+        { "key": "defect_type", "label": "Defect Type", "type": "dropdown", "choices": ["Porosity", "Slag", "LOF", "Crack", "Undercut", "Other"], "width": 180 },
+        { "key": "defect_code", "label": "Defect Code", "type": "text", "width": 140 },
+        { "key": "defect_length_mm", "label": "Defect Length (mm)", "type": "number", "width": 180 },
+        { "key": "repair_action", "label": "Repair Action", "type": "dropdown", "choices": ["Grind", "Gouge", "Re-weld", "Blend", "Other"], "width": 170 },
+        { "key": "removed_length_mm", "label": "Removed Length (mm)", "type": "number", "width": 190 },
+        { "key": "repair_welder", "label": "Repair Welder", "type": "text", "width": 160 },
+        { "key": "consumable_batch", "label": "Consumable Batch", "type": "text", "width": 180 },
+        { "key": "preheat_c", "label": "Preheat (°C)", "type": "number", "width": 140 },
+        { "key": "interpass_c", "label": "Interpass (°C)", "type": "number", "width": 150 },
+        { "key": "runout_length_mm", "label": "Runout Length (mm)", "type": "number", "width": 190 },
+        { "key": "arc_time_min", "label": "Arc Time (min)", "type": "number", "width": 160 },
+        { "key": "arc_volts", "label": "Volts (V)", "type": "number", "width": 120 },
+        { "key": "current_amps", "label": "Current (A)", "type": "number", "width": 140 },
+        { "key": "travel_speed_mm_min", "label": "Travel Speed (mm/min)", "type": "number", "width": 210 },
+        { "key": "heat_input_kj_mm", "label": "Heat Input (kJ/mm)", "type": "number", "width": 190 },
+        { "key": "result", "label": "Result", "type": "dropdown", "choices": ["Accept", "Reject"], "width": 140 },
+        { "key": "remarks", "label": "Remarks", "type": "text", "width": 260 }
+      ],
+      "minRows": 3
+    }
+  ]
+}

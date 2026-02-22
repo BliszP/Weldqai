@@ -1,0 +1,16 @@
+// Firebase web configuration template.
+// Copy this file to firebase-config.js and fill in your real values.
+// Values are in Firebase Console → Project Settings → Your apps → Web app → SDK setup.
+//
+// firebase-config.js is gitignored — NEVER commit the file with real values.
+// In CI, this file is written from the FIREBASE_WEB_CONFIG_JS GitHub Secret.
+
+self.firebaseConfig = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.firebasestorage.app",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId:             "YOUR_APP_ID",
+  measurementId:     "YOUR_MEASUREMENT_ID",
+};

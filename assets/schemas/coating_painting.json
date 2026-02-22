@@ -1,0 +1,46 @@
+{
+  "title": "Coating / Painting Report",
+  "standard": ["ISO 12944", "NACE/SSPC"],       
+  "standards": {                                
+    "ISO 12944": {
+      "details": [
+        { "key": "iso_env_category", "label": "ISO Category", "type": "choice", "choices": ["C1", "C2", "C3", "C4", "C5", "CX"] },
+        { "key": "durability_class", "label": "Durability Class", "type": "choice", "choices": ["Low (L)", "Medium (M)", "High (H)", "Very High (VH)"] }
+      ]
+    },
+    "NACE/SSPC": {
+      "details": [
+        { "key": "surface_prep_grade", "label": "Surface Prep Grade", "type": "choice", "choices": ["SP-6/NACE 3", "SP-10/NACE 2", "SP-5/NACE 1", "Other"] },
+        { "key": "sp10_note", "label": "SP-10 Note", "type": "static", "value": "Near-white metal; ≤5% staining/unit area" }
+      ]
+    }
+  },
+  "details": [
+    { "key": "project_name", "label": "Project", "shared": true },
+    { "key": "document_no", "label": "Document No.", "shared": true },
+    { "key": "date", "label": "Date", "type": "date", "shared": true },
+    { "key": "area", "label": "Area/Item", "type": "text" },
+    { "key": "system", "label": "Coating System", "type": "text" },
+    { "key": "surface_prep", "label": "Surface Prep", "type": "choice", "choices": ["SP-10", "SP-6", "Sa 2.5", "Other"] },
+    { "key": "ambient_temp_c", "label": "Ambient Temp (°C)", "type": "number" },
+    { "key": "rh_percent", "label": "RH (%)", "type": "number" },
+    { "key": "dewpoint_c", "label": "Dew Point (°C)", "type": "number" },
+    { "key": "inspector", "label": "Inspector", "shared": true }
+  ],
+  "tables": [
+    {
+      "key": "coats",
+      "label": "Coats",
+      "minRows": 1,
+      "columns": [
+        { "key": "coat_no", "label": "Coat #", "type": "number", "width": 80 },
+        { "key": "material", "label": "Material", "type": "text", "width": 150 },
+        { "key": "batch_no", "label": "Batch/LOT", "type": "text", "width": 120 },
+        { "key": "wet_film_thickness_um", "label": "WFT (µm)", "type": "number", "width": 110 },
+        { "key": "dry_film_thickness_um", "label": "DFT (µm)", "type": "number", "width": 110 },
+        { "key": "cure_time_h", "label": "Cure Time (h)", "type": "number", "width": 110 },
+        { "key": "result", "label": "Result", "type": "choice", "choices": ["Accept", "Recoat/Repair"], "width": 140 }
+      ]
+    }
+  ]
+}

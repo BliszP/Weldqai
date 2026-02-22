@@ -1,0 +1,36 @@
+{
+  "title": "Pipe Tally Log",
+  "standard": [
+    "API",
+    "Project Spec"
+  ],
+  "standards": {
+    "API": { "details": [ { "key": "api_ref", "label": "API Reference", "type": "text" } ] },
+    "Project Spec": { "details": [ { "key": "spec_ref", "label": "Spec Reference", "type": "text" } ] }
+  },
+
+  "details": [
+    { "key": "project_name", "label": "Project", "shared": true },
+    { "key": "document_no", "label": "Document No.", "shared": true },
+    { "key": "date", "label": "Date", "type": "date", "shared": true },
+    { "key": "spread", "label": "Spread/Crew", "type": "text" },
+    { "key": "inspector", "label": "Inspector", "shared": true }
+  ],
+  "tables": [
+    {
+      "key": "joints",
+      "label": "Joints",
+      "minRows": 5,
+      "columns": [
+        { "key": "joint_id", "label": "Joint ID", "type": "text", "width": 120 },
+        { "key": "heat_no", "label": "Heat No.", "type": "text", "width": 120 },
+        { "key": "length_m", "label": "Length (m)", "type": "number", "width": 110 },
+        { "key": "diameter_mm", "label": "OD (mm)", "type": "number", "width": 110 },
+        { "key": "wall_thk_mm", "label": "WT (mm)", "type": "number", "width": 110 },
+        { "key": "coating", "label": "Coating", "type": "text", "width": 120 },
+        { "key": "remarks", "label": "Remarks", "type": "text", "width": 160 }
+      ]
+    }
+  ]
+}
+

@@ -1,0 +1,253 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isCollaborator(userId, requiredPerm) {
+      let collabPath = /databases/$(database)/documents/users/$(userId)/sharedWith/$(request.auth.uid);
+
+      return isAuthenticated()
+        && exists(collabPath)
+        && get(collabPath).data.permissions is list
+        && requiredPerm in get(collabPath).data.permissions;
+    }
+
+    function isAdmin() {
+      return isAuthenticated()
+        && request.auth.token.email != null
+        && (
+          request.auth.token.email == 'alvespeters@gmail.com'
+          // || request.auth.token.email == 'another-admin@example.com'
+        );
+    }
+
+    // ============================================================================
+    // MATERIALS - GLOBAL CATALOG
+    // Readable by all authenticated users (reference data).
+    // Write restricted to admin — any authenticated user writing the shared
+    // catalog is a privilege-escalation risk.
+    // ============================================================================
+    match /materials/{materialId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ============================================================================
+    // USER ROOT DOCUMENT
+    // Needed for profile creation (complete_profile_screen) and batch deletes
+    // (report_catalog_screen). Read is open to authenticated users for
+    // email → uid lookups via UserDataRepository.
+    // ============================================================================
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isOwner(userId);
+    }
+
+    // ============================================================================
+    // MATERIALS - USER INVENTORY
+    // ============================================================================
+    match /users/{userId}/inventory/{itemId} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    match /users/{userId}/material_transactions/{transactionId} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    match /users/{userId}/purchase_orders/{orderId} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    match /users/{userId}/material_quality_issues/{issueId} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    // ============================================================================
+    // REPORTS, KPIs, VISUALIZATIONS, STATS, ALERTS
+    // ============================================================================
+    match /users/{userId}/reports/{document=**} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    match /users/{userId}/kpis/{document=**} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    match /users/{userId}/visualizations/{document=**} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    match /users/{userId}/stats/{document=**} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    match /users/{userId}/alerts/{document=**} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    // ============================================================================
+    // PRICING (public read)
+    // ============================================================================
+    match /pricing/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ============================================================================
+    // SUBSCRIPTION
+    // subscription/info contains hasAccess — NEVER writable by the client.
+    // The Stripe webhook (Admin SDK) sets it server-side and bypasses these rules.
+    // If a client writes subscription/info the write will be rejected here, which
+    // prevents any user from granting themselves hasAccess: true.
+    //
+    // subscription/trial is initialised and mutated by the client (trial tracking).
+    // subscription/credits read is owner; write is owner (client decrements on use).
+    //   Note: a malicious client can FieldValue.increment credits upward — move
+    //   credit deduction to a Cloud Function to eliminate this remaining risk.
+    // ============================================================================
+    match /users/{userId}/subscription/info {
+      allow read: if isOwner(userId);
+      allow write: if false; // Server-only (Admin SDK bypasses these rules)
+    }
+
+    match /users/{userId}/subscription/trial {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /users/{userId}/subscription/credits {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Catch-all for any future subscription sub-documents — read-only.
+    match /users/{userId}/subscription/{document=**} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    // ============================================================================
+    // ACTIVITY, QUEUE, STREAMS
+    // ============================================================================
+    match /users/{userId}/activity/{document=**} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    match /users/{userId}/queue/{document=**} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    match /users/{userId}/streams/{document=**} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    // ============================================================================
+    // CUSTOM SCHEMAS & TEMPLATES
+    // templates used by SyncService offline hydration
+    // ============================================================================
+    match /users/{userId}/custom_schemas/{schemaId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /users/{userId}/templates/{templateId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // ============================================================================
+    // CHAT (channels + direct chat collection used by UserDataRepository)
+    // ============================================================================
+    match /users/{userId}/channels/{channelId}/messages/{messageId} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow create: if isAuthenticated() && (isOwner(userId) || isCollaborator(userId, "read"));
+      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.senderId;
+    }
+
+    match /users/{userId}/channels/{channelId}/typing/{typingUserId} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isAuthenticated() && (isOwner(userId) || isCollaborator(userId, "read"));
+    }
+
+    match /users/{userId}/chat/{messageId} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow create: if isAuthenticated() && (isOwner(userId) || isCollaborator(userId, "read"));
+      allow update, delete: if isOwner(userId);
+    }
+
+    // ============================================================================
+    // PROFILE, META, INBOX
+    // ============================================================================
+    match /users/{userId}/profile/{document=**} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /users/{userId}/meta/{document} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    match /users/{userId}/inbox/{messageId} {
+      allow read, delete: if isOwner(userId);
+      allow create: if isAuthenticated();
+    }
+
+    // ============================================================================
+    // SHARING CONTROL
+    // ============================================================================
+    match /users/{userId}/sharedWith/{collaboratorId} {
+      allow read, write: if isOwner(userId);
+      allow read: if isAuthenticated() && request.auth.uid == collaboratorId;
+      allow read: if isCollaborator(userId, "read");
+    }
+
+    match /users/{userId}/sharedAccess/{ownerId} {
+      allow read, write: if isOwner(userId);
+      allow write: if isAuthenticated() && request.auth.uid == ownerId;
+    }
+
+    match /users/{userId}/myCollaborators/{collaboratorId} {
+      allow read, write: if isOwner(userId);
+      allow read: if isAuthenticated() && request.auth.uid == collaboratorId;
+    }
+
+    // ============================================================================
+    // DIRECTORY (email → UID lookup)
+    // ============================================================================
+    match /directory/{uid} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && request.auth.uid == uid;
+      allow delete: if false;
+    }
+
+    // ============================================================================
+    // CONTACT FORM (public submissions from welcome screen)
+    // ============================================================================
+    match /contact_messages/{messageId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if false;
+    }
+
+    // ============================================================================
+    // DENY EVERYTHING ELSE
+    // ============================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

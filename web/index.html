@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="WeldQAi — Welding &amp; Industrial QA/QC Inspection">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="WeldQAi">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>WeldQAi</title>
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+
+  <!-- Firebase config — loaded from gitignored firebase-config.js.
+       In CI: written from FIREBASE_WEB_CONFIG_JS GitHub Secret.
+       Locally: copy firebase-config.js.example to firebase-config.js and fill in values. -->
+  <script src="firebase-config.js"></script>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-analytics-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js"></script>
+
+  <!-- Firebase Initialization -->
+  <script>
+    firebase.initializeApp(self.firebaseConfig);
+    firebase.analytics();
+  </script>
+
+  <!-- Firebase Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+          .then(function() { /* registered */ })
+          .catch(function(err) { console.error('Service Worker registration failed:', err); });
+      });
+    }
+  </script>
+</body>
+</html>

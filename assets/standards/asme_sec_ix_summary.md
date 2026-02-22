@@ -1,0 +1,1 @@
+Qualification variables quick ref.
