@@ -30,6 +30,12 @@ Track every item needed before submitting to Google Play.
 |---|---|---|---|
 | F1 | Firestore subcollection rules | ✅ Deployed | `firestore.rules` |
 | F2 | Storage per-user isolation rules | ✅ Deployed | `storage.rules` |
+| F7 | Firestore: materials write restricted to admin | ✅ Done | `firestore.rules` |
+| F8 | Firestore: `subscription/info` write=false (server-only) | ✅ Done | `firestore.rules` |
+| F9 | Firestore: meta write restricted (read-only collab fix) | ✅ Done | `firestore.rules` |
+| F10 | Storage: branding write restricted to admin | ✅ Done | `storage.rules` |
+| F11 | Cloud Functions: remove Stripe key debug logging | ✅ Done | `functions/index.js` |
+| F12 | Git history: Firebase web API key removed (force push) | ✅ Done | Orphan branch rewrite Feb 2026 |
 | F3 | App Check `playIntegrity` in release | ✅ Done | `lib/main.dart:69` |
 | F4 | Stripe `success_url` / `cancel_url` real URLs | ✅ Done | `functions/index.js` → `https://weldqai.com` |
 | F5 | `hasAccess` server-only (not written from client) | ✅ Done | `subscription_service.dart` |
@@ -77,6 +83,14 @@ completes payment on Stripe, they cannot be redirected back to the app.
 **Fix:** Replaced with `https://weldqai.com/payment-success`, `/payment-cancel`,
 and `/account` (billing portal return URL).
 
+### [x] P0.4 — Stripe secret key prefix logged to GCP — Fixed Feb 2026
+**File:** `functions/index.js` — `createCheckoutSession` and `createSubscription`
+**Problem:** Debug `console.log` statements logged the Stripe secret key prefix and full
+request payloads to GCP Cloud Functions logs (which are retained and accessible to anyone
+with GCP project access).
+**Fix:** Removed all verbose debug logging from Cloud Functions. Only milestone logs remain
+(e.g. `✅ Checkout session created for user ${userId}`).
+
 ---
 
 ## P1 — Fix Before Growth (security / reliability)
@@ -104,6 +118,27 @@ sets `hasAccess: true` on `customer.subscription.created` (server-only).
 **File:** `storage.rules`
 **Problem:** Catch-all `allow read, write: if request.auth != null` — no user isolation.
 **Fix:** Per-user scoped rules with `firestore.get()` collaborator check. Deployed.
+
+### [x] P1.5b — Firestore rules allow any user to write global materials catalog — Fixed Feb 2026
+**File:** `firestore.rules`
+**Problem:** `allow create, update, delete: if isAuthenticated()` on `/materials/{id}` let
+any paying or trial user corrupt the shared reference catalog (add fake alloys, prices, etc.)
+**Fix:** Changed to `if isAdmin()` — only the admin account can mutate the catalog.
+
+### [x] P1.5c — `subscription/info` writable by owner, allowing hasAccess bypass — Fixed Feb 2026
+**File:** `firestore.rules`
+**Problem:** `allow read, write: if isOwner(userId)` on the subscription wildcard meant any
+authenticated owner could write `{ hasAccess: true }` directly to Firestore, bypassing the
+Stripe payment flow entirely.
+**Fix:** Split subscription rules. `subscription/info` is now `allow write: if false`.
+The Stripe webhook (Admin SDK) writes `hasAccess` server-side and bypasses this rule.
+`subscription/trial` and `subscription/credits` remain owner-writable.
+
+### [x] P1.5d — Storage branding writable by any authenticated user — Fixed Feb 2026
+**File:** `storage.rules`
+**Problem:** `allow write: if request.auth != null` on `/branding/**` let any user replace
+the app's shared branding assets with malicious content.
+**Fix:** Changed to `if isAdmin()` (admin email check on the auth token).
 
 ### [ ] P1.5 — iOS bundle ID is a placeholder
 **File:** `lib/firebase_options.dart`, `ios/Runner/Info.plist`
