@@ -69,6 +69,9 @@ dependencies:
   logger: ^2.4.0
   sentry_flutter: ^8.9.0
 
+  # Connectivity
+  connectivity_plus: ^6.1.0
+
   # Storage & Utilities
   shared_preferences: ^2.2.3
   uuid: ^4.5.1

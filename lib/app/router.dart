@@ -23,6 +23,7 @@ import 'package:weldqai_app/features/reports/base/report_catalog_screen.dart';
 import 'package:weldqai_app/core/repositories/user_data_repository.dart';
 import 'package:weldqai_app/core/repositories/metrics_repository.dart';
 import 'package:weldqai_app/features/notifications/notifications_screen.dart';
+import 'package:weldqai_app/features/offline/offline_mode_screen.dart';
 
 final UserDataRepository _userDataRepo = UserDataRepository();
 final MetricsRepository _metricsRepo = MetricsRepository();
@@ -254,6 +255,13 @@ case Paths.collaboration: {
           builder: (_) => AccountSettingsScreen(userId: userId),
         );
       }
+
+      // ----------------- Offline mode ------------------
+      case Paths.offline:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const OfflineModeScreen(),
+        );
 
       // ----------------- Fallback ----------------------
       default:

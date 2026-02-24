@@ -155,17 +155,22 @@ Run `flutterfire configure` to regenerate. Requires Apple Developer account.
 
 ## P2 — Architecture Improvements
 
-### [ ] P2.1 — Migrate Provider to Riverpod
-**Current:** Single `WorkspaceProvider` `ChangeNotifier` via `provider` package.
-**Problem:** No scoped state, no built-in error/loading states, manual stream management.
-**Fix:** Migrate to `flutter_riverpod`. Start with subscription status stream.
+### [x] P2.1 — Migrate Provider to Riverpod — Fixed Feb 2026
+**Current:** `WorkspaceProvider` (ChangeNotifier) stays for workspace switching.
+Subscription status migrated to `subscriptionStatusProvider` (Riverpod `StreamProvider`)
+in `lib/core/providers/subscription_providers.dart`. `project_dashboard_screen` and
+`account_settings_screen` now use `ref.watch(subscriptionStatusProvider)`. Removed
+duplicate Firestore listeners (was 3 → now 1 shared stream). `ProviderScope` added in
+`lib/main.dart`. Riverpod 2.5.1 added to `pubspec.yaml`.
 
-### [ ] P2.2 — Split DynamicReportForm God Widget
-**File:** `lib/features/reports/base/dynamic_report_form.dart` (~1,426 lines)
-**Problem:** Single widget handles schema parsing, 8 field types, row tables, validation,
-Firestore save, rollup stats, PDF/Excel export, branding, photo, signature, OCR, formula.
-**Fix:** Extract into: `ReportFormHeader`, `ReportEntryTable`, `ReportActionBar`,
-`ReportPhotoSection`, `ReportSignatureSection`. Use Riverpod for form state.
+### [x] P2.2 — Split DynamicReportForm God Widget — Fixed Feb 2026
+**File:** `lib/features/reports/base/dynamic_report_form.dart` (was 1,429 lines → 956)
+**Fix:** Extracted three focused widgets to `lib/features/reports/widgets/`:
+- `ReportActionBar` (128 lines) — toolbar: scan/save/export/photos/signatures
+- `ReportDetailsGrid` (298 lines) — header fields: text/dropdown/date/calculated/number/textarea
+- `ReportEntryTable` (322 lines) — scrollable data-entry table with row add/delete
+Parent state retains controller ownership, schema logic, Firebase calls, formula engine.
+Child widgets receive data + callbacks; each manages its own local setState for display.
 
 ### [x] P2.3 — Consolidate duplicate Paths class — Fixed Feb 2026
 **Files:** `lib/app/router.dart` and `lib/app/constants/paths.dart`
@@ -237,8 +242,8 @@ Firebase Auth supports SAML 2.0 and OIDC providers. Configure per-organisation.
 | `test/unit/repositories/report_repository_test.dart` | Unit (FakeFirestore) | `saveReport()` CRUD, path correctness |
 | `test/widget/auth_screen_test.dart` | Widget | Form rendering, validation |
 
-**Coverage gaps:** `dynamic_report_form.dart` (blocked until split), `export_service.dart`
-(needs golden tests), `payment_service.dart` (needs Stripe test mode), E2E flow.
+**Coverage gaps:** `export_service.dart` (needs golden tests), `payment_service.dart`
+(needs Stripe test mode), `ReportDetailsGrid`/`ReportEntryTable` (now unblocked after P2.2 split), E2E flow.
 
 ---
 

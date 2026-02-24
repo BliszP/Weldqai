@@ -12,6 +12,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart' hide Consumer;
 import 'package:weldqai_app/core/providers/subscription_providers.dart';
 import 'package:weldqai_app/core/services/subscription_service.dart';
 import 'package:weldqai_app/features/account/widgets/upgrade_options_dialog.dart';
+import 'package:weldqai_app/core/providers/connectivity_provider.dart';
+import 'package:weldqai_app/core/services/sync_service.dart';
+import 'package:weldqai_app/features/offline/widgets/sync_banner.dart';
 
 
 /// ---------- Loader typedefs (Futures required; Streams optional) ----------
@@ -266,6 +269,13 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
         loading: () => const SizedBox.shrink(),
         error: (_, __) => const SizedBox.shrink(),
       ),
+      // Connectivity indicator — shows online/offline state.
+      // Tap "Offline Mode" in the drawer to manage sync settings.
+      SyncBanner(
+        isOnline: ref.watch(connectivityProvider).valueOrNull ?? true,
+        pendingCount: 0,
+        onTapSync: () => SyncService().syncForCurrentUser(),
+      ),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -426,6 +436,11 @@ class _MainDrawer extends StatelessWidget {
               onTap: () => _go(context, Paths.chat),
             ),
 
+            ListTile(
+              leading: const Icon(Icons.wifi_outlined),
+              title: const Text('Offline Mode'),
+              onTap: () => _go(context, Paths.offline),
+            ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.settings_outlined),

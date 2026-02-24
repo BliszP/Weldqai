@@ -22,4 +22,7 @@ class Paths {
   static const String activityStream = '/activity-stream';
   static const String workQueue      = '/work-queue';
   static const String alertsScreen   = '/alerts';
+
+  // Offline mode
+  static const String offline = '/offline';
 }
