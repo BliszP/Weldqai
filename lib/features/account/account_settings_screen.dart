@@ -14,6 +14,8 @@ import 'package:weldqai_app/core/services/theme_controller.dart';
 import 'package:weldqai_app/core/services/sync_service.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:firebase_performance/firebase_performance.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:weldqai_app/core/providers/subscription_providers.dart';
 import 'package:weldqai_app/core/services/subscription_service.dart';
 import 'package:weldqai_app/features/account/widgets/upgrade_options_dialog.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -46,7 +48,7 @@ class BrandingRuntimeAssets {
   }
 }
 
-class AccountSettingsScreen extends StatefulWidget {
+class AccountSettingsScreen extends ConsumerStatefulWidget {
   const AccountSettingsScreen({
     super.key,
     required this.userId,
@@ -55,10 +57,10 @@ class AccountSettingsScreen extends StatefulWidget {
   final String userId;
 
   @override
-  State<AccountSettingsScreen> createState() => _AccountSettingsScreenState();
+  ConsumerState<AccountSettingsScreen> createState() => _AccountSettingsScreenState();
 }
 
-class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
+class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _companyCtrl = TextEditingController();
@@ -643,25 +645,20 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
               const SizedBox(height: 16),
               _sectionTitle(context, 'Subscription'),
-              StreamBuilder<SubscriptionStatus>(
-                stream: SubscriptionService().watchStatus(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.workspace_premium),
-                        title: const Text('Loading...'),
-                      ),
-                    );
-                  }
-
-                  final status = snapshot.data!;
-                  
+              ref.watch(subscriptionStatusProvider).when(
+                loading: () => const Card(
+                  child: ListTile(
+                    leading: Icon(Icons.workspace_premium),
+                    title: Text('Loading...'),
+                  ),
+                ),
+                error: (_, __) => const SizedBox.shrink(),
+                data: (status) {
                   String title;
                   String subtitle;
                   Color? iconColor;
                   IconData icon;
-                  
+
                   switch (status.type) {
                     case SubscriptionType.trial:
                       icon = Icons.hourglass_empty;
@@ -669,55 +666,47 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                       title = 'Free Trial';
                       subtitle = '${status.reportsRemaining} reports left • ${status.daysRemaining} days';
                       break;
-                      
                     case SubscriptionType.trialExpired:
                       icon = Icons.block;
                       iconColor = Colors.red;
                       title = 'Trial Ended';
                       subtitle = 'Upgrade to continue';
                       break;
-                      
                     case SubscriptionType.payPerReport:
                       icon = Icons.receipt_long;
                       iconColor = Colors.blue;
                       title = 'Pay Per Report';
                       subtitle = '${status.creditsRemaining} reports remaining';
                       break;
-                      
                     case SubscriptionType.monthlyIndividual:
                       icon = Icons.workspace_premium;
                       iconColor = Colors.green;
                       title = 'Individual Plan';
-                      
                       if (status.currentPeriodEnd != null) {
                         final renewDate = status.currentPeriodEnd!;
-                        final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                        final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                         final formattedDate = '${months[renewDate.month - 1]} ${renewDate.day}, ${renewDate.year}';
-                        
-                        if (status.cancelAtPeriodEnd == true) {
-                          subtitle = 'Access until $formattedDate';
-                        } else {
-                          subtitle = 'Renews $formattedDate for \$50.00';
-                        }
+                        subtitle = status.cancelAtPeriodEnd == true
+                            ? 'Access until $formattedDate'
+                            : 'Renews $formattedDate for \$50.00';
                       } else {
                         subtitle = 'Unlimited reports';
                       }
                       break;
-                      
                     case SubscriptionType.team:
                       icon = Icons.groups;
                       iconColor = Colors.purple;
                       title = 'Team Plan';
                       subtitle = status.isTeamOwner == true ? 'Team Owner' : 'Team Member';
                       break;
-                      
                     default:
                       icon = Icons.help_outline;
+                      iconColor = null;
                       title = 'Unknown';
                       subtitle = 'Tap to upgrade';
                   }
-                  
+
                   return Card(
                     child: Column(
                       children: [
@@ -728,7 +717,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                           trailing: const Icon(Icons.chevron_right),
                           onTap: _openUpgradeDialog,
                         ),
-                        
                         if (status.type == SubscriptionType.monthlyIndividual) ...[
                           const Divider(height: 1),
                           Padding(
@@ -758,14 +746,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                                             duration: Duration(seconds: 2),
                                           ),
                                         );
-
-                                        final callable = FirebaseFunctions.instance.httpsCallable(
-                                          'createBillingPortalSession',
-                                        );
-                                        
+                                        final callable = FirebaseFunctions.instance
+                                            .httpsCallable('createBillingPortalSession');
                                         final result = await callable.call();
                                         final portalUrl = result.data['url'] as String;
-
                                         await launchUrl(
                                           Uri.parse(portalUrl),
                                           mode: LaunchMode.externalApplication,

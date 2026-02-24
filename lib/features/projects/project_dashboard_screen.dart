@@ -8,7 +8,9 @@ import 'package:weldqai_app/core/services/push_service.dart';
 import 'package:weldqai_app/features/sharing/share_access_screen.dart';
 import 'package:weldqai_app/features/notifications/notifications_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:weldqai_app/core/services/subscription_service.dart'; // ✅ ADD THIS
+import 'package:flutter_riverpod/flutter_riverpod.dart' hide Consumer;
+import 'package:weldqai_app/core/providers/subscription_providers.dart';
+import 'package:weldqai_app/core/services/subscription_service.dart';
 import 'package:weldqai_app/features/account/widgets/upgrade_options_dialog.dart';
 
 
@@ -27,7 +29,7 @@ typedef StreamKpis = Stream<Map<String, dynamic>>;
 
 
 /// --------------------------------------------------------------------------
-class ProjectDashboardScreen extends StatefulWidget {
+class ProjectDashboardScreen extends ConsumerStatefulWidget {
   const ProjectDashboardScreen({
     super.key,
     required this.userId,
@@ -90,13 +92,13 @@ class ProjectDashboardScreen extends StatefulWidget {
   
 
   @override
-  State<ProjectDashboardScreen> createState() => _ProjectDashboardScreenState();
+  ConsumerState<ProjectDashboardScreen> createState() => _ProjectDashboardScreenState();
 }
 
 enum _DashMenu { account, signOut }
 
 
-class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
+class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen> {
   int _page = 1;
 
   Future<Map<String, dynamic>>           get _summaryF  => widget.loadSummary();
@@ -212,67 +214,58 @@ class _ProjectDashboardScreenState extends State<ProjectDashboardScreen> {
       body: SafeArea(
         child: Column(  // ✅ CHANGED: Wrap in Column
           children: [
-      // ✅ ADD: Trial banner
-   // ✅ FIXED (auto-updates in real-time):
-StreamBuilder<SubscriptionStatus>(
-  stream: SubscriptionService().watchStatus(), // ← Use stream instead
-  builder: (context, snapshot) {
-    if (!snapshot.hasData) return SizedBox.shrink();
-    
-    final status = snapshot.data!;
-    
-    // Show banner only for trial or expired trial
-    if (status.type != SubscriptionType.trial && 
-        status.type != SubscriptionType.trialExpired) {
-      return SizedBox.shrink();
-    }
-    
-    final remaining = status.reportsRemaining ?? 0;
-    final days = status.daysRemaining;
-    final isExpired = status.type == SubscriptionType.trialExpired;
-    
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: isExpired 
-          ? Colors.red[100]
-          : remaining <= 1 
-              ? Colors.orange[100]
-              : Colors.blue[50],
-      child: Row(
-        children: [
-          Icon(
-            isExpired ? Icons.block : Icons.info_outline,
-            color: isExpired 
-                ? Colors.red 
-                : remaining <= 1 ? Colors.orange : Colors.blue,
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              isExpired
-                  ? 'Trial ended - Upgrade to continue creating reports'
-                  : '$remaining reports left${days != null ? ' • $days days remaining' : ''}',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: isExpired ? Colors.red[900] : null,
-              ),
+      // Trial banner — sourced from the shared Riverpod subscription provider.
+      ref.watch(subscriptionStatusProvider).when(
+        data: (status) {
+          if (status.type != SubscriptionType.trial &&
+              status.type != SubscriptionType.trialExpired) {
+            return const SizedBox.shrink();
+          }
+          final remaining = status.reportsRemaining ?? 0;
+          final days = status.daysRemaining;
+          final isExpired = status.type == SubscriptionType.trialExpired;
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: isExpired
+                ? Colors.red[100]
+                : remaining <= 1
+                    ? Colors.orange[100]
+                    : Colors.blue[50],
+            child: Row(
+              children: [
+                Icon(
+                  isExpired ? Icons.block : Icons.info_outline,
+                  color: isExpired
+                      ? Colors.red
+                      : remaining <= 1 ? Colors.orange : Colors.blue,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    isExpired
+                        ? 'Trial ended - Upgrade to continue creating reports'
+                        : '$remaining reports left${days != null ? ' • $days days remaining' : ''}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: isExpired ? Colors.red[900] : null,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => showUpgradeOptionsDialog(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isExpired ? Colors.red : Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Upgrade'),
+                ),
+              ],
             ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              showUpgradeOptionsDialog(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isExpired ? Colors.red : Colors.blue,
-              foregroundColor: Colors.white,
-            ),
-            child: Text('Upgrade'),
-          ),
-        ],
+          );
+        },
+        loading: () => const SizedBox.shrink(),
+        error: (_, __) => const SizedBox.shrink(),
       ),
-    );
-  },
-),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(16),

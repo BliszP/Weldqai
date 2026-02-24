@@ -36,6 +36,7 @@ dependencies:
 
   # UI
   provider: ^6.0.5
+  flutter_riverpod: ^2.5.1
   fl_chart: ^0.66.0
   font_awesome_flutter: ^10.7.0
   cupertino_icons: ^1.0.8

@@ -19,6 +19,7 @@ import 'package:weldqai_app/core/services/sync_service.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:weldqai_app/core/repositories/user_data_repository.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' hide ChangeNotifierProvider;
 import 'package:weldqai_app/core/services/notification_service.dart';
 import 'package:weldqai_app/core/services/logger_service.dart';
 import 'package:weldqai_app/core/services/error_service.dart';
@@ -75,7 +76,7 @@ Future<void> _appRunner() async {
   // FirebaseFirestore.instance.settings here — a second call throws on web.
   await ThemeController.i.load();
   await SyncService().init(); // ← sets Firestore.settings once
-  runApp(const WeldQAiApp());
+  runApp(const ProviderScope(child: WeldQAiApp()));
 }
 
 class WeldQAiApp extends StatelessWidget {
@@ -133,9 +134,9 @@ class AuthGate extends StatelessWidget {
           // Initialize user profile on first login (fire-and-forget; errors handled internally)
           unawaited(_initializeUserProfile(user));
 
-          // Start subscription stream and navigate to dashboard
+          // Navigate to dashboard. Subscription stream starts automatically
+          // when screens first watch subscriptionStatusProvider (Riverpod).
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            context.read<WorkspaceProvider>().startListening();
             unawaited(Navigator.of(context).pushReplacementNamed(Paths.dashboard));
           });
 
