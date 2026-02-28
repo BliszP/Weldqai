@@ -196,16 +196,17 @@ All BuildContext-across-async-gap warnings resolved across 9 files. `flutter ana
 
 ## P3 — Enterprise Features
 
-### [ ] P3.1 — Move subscription enforcement to Cloud Functions
-Add server-side middleware check in `functions/index.js` per Cloud Function call.
+### [x] P3.1 — Move subscription enforcement to Cloud Functions — Done Feb 2026
+`assertHasAccess(userId)` helper added to `functions/index.js`. Reads `subscription/info`
+and `subscription/trial` in parallel; throws `HttpsError('permission-denied')` if neither
+active. Applied to `createBillingPortalSession`. `getSubscriptionDetails` callable added —
+returns authoritative server-side snapshot `{ hasAccess, status, subscriptionType,
+currentPeriodEnd, cancelAtPeriodEnd, trialStatus, reportCredits }`.
 
-### [ ] P3.2 — Wire offline UI
-Archived screens in `archive/offline_ui/`:
-- `offline_mode_screen.dart`
-- `widgets/offline_badge.dart`
-- `widgets/sync_banner.dart`
-
-Move to `lib/features/offline/`, wire into dashboard using `connectivity_plus`.
+### [x] P3.2 — Wire offline UI — Done Feb 2026
+`lib/features/offline/` contains `OfflineModeScreen` (real `SyncService` calls), `SyncBanner`
+(40px `PreferredSizeWidget`). Router + drawer entry `Paths.offline` wired.
+Dashboard AppBar shows `SyncBanner` as `bottom:` only when offline.
 
 ### [ ] P3.3 — Organisation-level multi-tenancy
 Add `/organisations/{orgId}/` collection with member subcollections and shared
@@ -242,8 +243,10 @@ Firebase Auth supports SAML 2.0 and OIDC providers. Configure per-organisation.
 | `test/unit/repositories/report_repository_test.dart` | Unit (FakeFirestore) | `saveReport()` CRUD, path correctness |
 | `test/widget/auth_screen_test.dart` | Widget | Form rendering, validation |
 
+| `test/widget/report_widgets_test.dart` | Widget | `ReportDetailsGrid` (6 tests), `ReportEntryTable` (5 tests) |
+
 **Coverage gaps:** `export_service.dart` (needs golden tests), `payment_service.dart`
-(needs Stripe test mode), `ReportDetailsGrid`/`ReportEntryTable` (now unblocked after P2.2 split), E2E flow.
+(needs Stripe test mode), E2E flow.
 
 ---
 

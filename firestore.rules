@@ -274,12 +274,38 @@ service cloud.firestore {
     }
 
     // ============================================================================
+    // INSPECTOR PROFILES — team member certs managed from Account Settings
+    // Owner-only: only the account holder can create/update/delete profiles.
+    // ============================================================================
+    match /users/{userId}/inspector_profiles/{profileId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // ============================================================================
     // AUDIT LOG — immutable; create only, never update or delete
     // ============================================================================
     match /users/{userId}/audit_log/{logId} {
       allow read:          if isOwner(userId);
       allow create:        if isOwner(userId) || isCollaborator(userId, "write");
       allow update, delete: if false; // Immutable — audit entries cannot be modified
+    }
+
+    // ============================================================================
+    // COLLECTION GROUP: items  (report entries stored at
+    //   /users/{uid}/reports/{schemaId}/items/{itemId})
+    //
+    // Firestore requires an explicit collection-group rule for
+    // collectionGroup('items') queries — path-based rules alone are not
+    // sufficient.  Reads are permitted only when the document's own userId
+    // field matches the authenticated user, ensuring cross-user leakage is
+    // impossible even though the rule is path-agnostic.
+    // ============================================================================
+    match /{path=**}/items/{itemId} {
+      allow read: if request.auth != null
+                  && resource.data.userId == request.auth.uid;
+      // Writes go through the specific /users/{userId}/reports/{document=**}
+      // rule above — they are rejected here to avoid ambiguity.
+      allow write: if false;
     }
 
     // ============================================================================

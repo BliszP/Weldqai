@@ -326,6 +326,9 @@ Future<exports.ExportServiceBrandingConfig> _loadBranding() async {
     String? companyLogoUrl;
     String? clientName;
     String? clientLogoUrl;
+    String? certBody;
+    String? certNumber;
+    String? certExpiry;
 
     if (uid != null) {
       // Read /users/{uid}/profile/info (same doc used in Account Settings)
@@ -337,9 +340,14 @@ Future<exports.ExportServiceBrandingConfig> _loadBranding() async {
       companyName    = (d['company'] ?? '').toString();
       companyLogoUrl = (d['companyLogoUrl'] ?? '').toString();
 
-      // ⬇️ NEW: client fields stored alongside company fields
+      // ⬇️ client fields stored alongside company fields
       clientName     = (d['clientName'] ?? '').toString();
       clientLogoUrl  = (d['clientLogoUrl'] ?? '').toString();
+
+      // ⬇️ inspector cert fields (set in Account Settings → Inspector Certification)
+      certBody   = (d['certBody']   ?? '').toString();
+      certNumber = (d['certNumber'] ?? '').toString();
+      certExpiry = (d['certExpiry'] ?? '').toString();
     }
 
     Future<Uint8List?> fetchBytes(String? urlOrPath) async {
@@ -394,6 +402,11 @@ Future<exports.ExportServiceBrandingConfig> _loadBranding() async {
     addKV('Date', summary['date']);
     addKV('Shift', summary['shift']);
     if ((clientName ?? '').isNotEmpty) addKV('Client', clientName);
+    if ((certNumber ?? '').isNotEmpty) {
+      final label = (certBody ?? '').isNotEmpty ? 'Inspector (${certBody!})' : 'Inspector Cert';
+      final expPart = (certExpiry ?? '').isNotEmpty ? ' · exp. $certExpiry' : '';
+      addKV(label, '${certNumber!}$expPart');
+    }
 
     return exports.ExportServiceBrandingConfig(
       leftLogoBytes: leftBytes,

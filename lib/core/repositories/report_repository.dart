@@ -108,6 +108,9 @@ if (isNewReport && !skipSubscriptionCheck) {  // ✅ ADDED && !skipSubscriptionC
       'updatedAt': nowTs,
       'updatedBy': _auth.currentUser?.uid,
       'updatedAtText': nowIso,
+      // Top-level fields for collectionGroup history queries
+      if ((payload['projectId'] as String?)?.isNotEmpty == true)
+        'projectId': payload['projectId'],
     };
 
     late String id;
@@ -120,6 +123,7 @@ if (isNewReport && !skipSubscriptionCheck) {  // ✅ ADDED && !skipSubscriptionC
         'createdAt': nowTs,
         'createdAtText': nowIso,
         'createdBy': _auth.currentUser?.uid,
+        'workflowStatus': 'draft', // Initial workflow state for approval flow
       });
       id = doc.id;
     }
@@ -1236,5 +1240,129 @@ Map<String, int> _repairsReasons30dDelta(
     }
 
     return m;
+  }
+
+  // ── Report history (collectionGroup) ──────────────────────────────────────
+
+  /// Live stream of recent report items across all schemas for [userId].
+  /// Optionally filtered to a single [projectId].
+  Stream<List<Map<String, dynamic>>> watchReportHistory(
+    String userId, {
+    String? projectId,
+    int limit = 200,
+  }) {
+    Query<Map<String, dynamic>> q;
+    if (projectId != null && projectId.isNotEmpty) {
+      q = _db
+          .collectionGroup('items')
+          .where('userId', isEqualTo: userId)
+          .where('projectId', isEqualTo: projectId)
+          .orderBy('updatedAt', descending: true)
+          .limit(limit);
+    } else {
+      q = _db
+          .collectionGroup('items')
+          .where('userId', isEqualTo: userId)
+          .orderBy('updatedAt', descending: true)
+          .limit(limit);
+    }
+    return q.snapshots().map(
+          (snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList(),
+        );
+  }
+
+  /// Advances the workflow status of a single report item.
+  /// Valid [newStatus]: 'draft' | 'submitted' | 'approved' | 'rejected'.
+  /// Writes a notification to [userId]/inbox so the owner sees the change.
+  Future<void> updateWorkflowStatus(
+    String userId,
+    String schemaId,
+    String reportId,
+    String newStatus, {
+    String? note,
+  }) async {
+    try {
+      await _db
+          .collection('users')
+          .doc(userId)
+          .collection('reports')
+          .doc(schemaId)
+          .collection('items')
+          .doc(reportId)
+          .update({
+        'workflowStatus': newStatus,
+        if (note != null && note.isNotEmpty) 'workflowNote': note,
+        'workflowUpdatedAt': FieldValue.serverTimestamp(),
+        'workflowUpdatedBy': _auth.currentUser?.uid,
+        // Approved reports are immutable — Firestore rules block further updates
+        // once lockedAt is non-null.
+        if (newStatus == 'approved') ...{
+          'lockedAt': FieldValue.serverTimestamp(),
+          'lockedByEmail': _auth.currentUser?.email,
+        },
+      });
+      AppLogger.info('✅ workflowStatus → $newStatus ($schemaId/$reportId)');
+
+      // Fire-and-forget: write inbox notification + audit entry
+      _writeWorkflowNotification(
+        userId: userId,
+        schemaId: schemaId,
+        reportId: reportId,
+        newStatus: newStatus,
+        note: note,
+      );
+      if (newStatus == 'approved') {
+        AuditLogService().logReportLock(userId, reportId, schemaId: schemaId);
+      }
+    } catch (e, st) {
+      AppLogger.error('❌ updateWorkflowStatus failed', error: e, stackTrace: st);
+      rethrow;
+    }
+  }
+
+  void _writeWorkflowNotification({
+    required String userId,
+    required String schemaId,
+    required String reportId,
+    required String newStatus,
+    String? note,
+  }) {
+    final actor = _auth.currentUser?.email ?? 'Someone';
+    final schemaLabel = schemaId.replaceAll('_', ' ');
+
+    String title;
+    String body;
+    switch (newStatus) {
+      case 'submitted':
+        title = 'Inspection submitted for review';
+        body  = '$schemaLabel report submitted by $actor';
+      case 'approved':
+        title = 'Inspection approved';
+        body  = '$schemaLabel report approved by $actor';
+      case 'rejected':
+        title = 'Inspection rejected';
+        body  = '$schemaLabel report rejected by $actor'
+            '${note != null && note.isNotEmpty ? ': $note' : ''}';
+      default:
+        return; // no notification for draft or unknown
+    }
+
+    _db
+        .collection('users')
+        .doc(userId)
+        .collection('inbox')
+        .add({
+      'title':    title,
+      'body':     body,
+      'type':     'workflow',
+      'schemaId': schemaId,
+      'reportId': reportId,
+      'status':   newStatus,
+      'read':     false,
+      'createdAt': FieldValue.serverTimestamp(),
+    })
+        .then((_) => AppLogger.debug('📬 Workflow notification sent → $userId'))
+        .catchError((e) =>
+            AppLogger.warning('⚠️ Could not write workflow notification: $e'));
   }
 }

@@ -28,6 +28,8 @@ import 'package:weldqai_app/features/sharing/share_access_screen.dart';
 import 'package:weldqai_app/features/projects/projects_list_screen.dart';
 import 'package:weldqai_app/features/projects/create_project_screen.dart';
 import 'package:weldqai_app/features/projects/project_detail_screen.dart';
+import 'package:weldqai_app/features/reports/reports_history_screen.dart';
+import 'package:weldqai_app/features/account/audit_log_screen.dart';
 
 final UserDataRepository _userDataRepo = UserDataRepository();
 final MetricsRepository _metricsRepo = MetricsRepository();
@@ -293,6 +295,30 @@ case Paths.collaboration:
             projectId: projectId,
             project:   project,
           ),
+        );
+      }
+
+      // ----------------- Report history ---------------
+      case Paths.reportsHistory: {
+        final userId      = _getCurrentUserId()!;
+        final projectId   = args['projectId']   as String?;
+        final projectName = args['projectName'] as String?;
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => ReportsHistoryScreen(
+            userId:      userId,
+            projectId:   projectId,
+            projectName: projectName,
+          ),
+        );
+      }
+
+      // ----------------- Audit log --------------------
+      case Paths.auditLog: {
+        final userId = _getCurrentUserId()!;
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => AuditLogScreen(userId: userId),
         );
       }
 

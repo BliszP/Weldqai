@@ -30,4 +30,10 @@ class Paths {
   static const String projects      = '/projects';
   static const String createProject = '/projects/create';
   static const String projectDetail = '/projects/detail';
+
+  // Report history
+  static const String reportsHistory = '/reports/history';
+
+  // Audit log
+  static const String auditLog = '/audit-log';
 }

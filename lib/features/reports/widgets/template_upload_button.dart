@@ -387,6 +387,7 @@ class _TemplateUploadButtonState extends State<TemplateUploadButton> {
       'createdAt': now,
       'updatedAt': now,
       'createdBy': uid,
+      if (widget.projectId != null) 'projectId': widget.projectId!,
     };
 
     await col.doc(schemaIdToUse).set(toSave);

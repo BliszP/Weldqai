@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:weldqai_app/app/constants/paths.dart';
 import 'package:weldqai_app/core/design/app_tokens.dart';
 import 'package:weldqai_app/core/repositories/project_repository.dart';
+import 'package:weldqai_app/core/repositories/report_repository.dart';
 import 'package:weldqai_app/core/services/logger_service.dart';
 import 'package:weldqai_app/features/projects/create_project_screen.dart';
 
@@ -329,6 +330,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
           const SizedBox(height: 16),
 
+          // ── Approval summary ─────────────────────────────────────────────
+          _ApprovalSummaryCard(
+            userId: widget.userId,
+            projectId: widget.projectId,
+          ),
+
+          const SizedBox(height: 16),
+
           // ── Per-type stats ───────────────────────────────────────────────
           _TypeStatsSection(
             userId: widget.userId,
@@ -387,8 +396,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.pushNamed(
                 context,
-                Paths.qcCatalog,
-                arguments: {'projectId': widget.projectId},
+                Paths.reportsHistory,
+                arguments: {
+                  'projectId':   widget.projectId,
+                  'projectName': widget.project['title'] as String?
+                      ?? widget.project['name'] as String?,
+                },
               ),
             ),
           ),
@@ -518,6 +531,125 @@ class _TypeStatRow extends StatelessWidget {
               backgroundColor: color.withValues(alpha: 0.12),
               valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Approval summary card ─────────────────────────────────────────────────────
+
+/// Streams all report items for this project and shows a 4-bucket summary:
+/// Total · Approved · Pending · Rejected.
+/// Hidden when no reports exist yet.
+class _ApprovalSummaryCard extends StatelessWidget {
+  const _ApprovalSummaryCard({
+    required this.userId,
+    required this.projectId,
+  });
+
+  final String userId;
+  final String projectId;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: ReportRepository().watchReportHistory(userId, projectId: projectId),
+      builder: (context, snap) {
+        final items = snap.data ?? const [];
+        if (items.isEmpty) return const SizedBox.shrink();
+
+        int approved = 0, pending = 0, rejected = 0;
+        for (final item in items) {
+          final status = item['workflowStatus'] as String? ?? 'draft';
+          if (status == 'approved') {
+            approved++;
+          } else if (status == 'rejected') {
+            rejected++;
+          } else {
+            pending++;
+          }
+        }
+
+        return _SectionCard(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.verified_outlined,
+                        size: 18, color: scheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Approval Status',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _ApprovalBucket(
+                        label: 'Total',
+                        count: items.length,
+                        color: scheme.primary),
+                    _ApprovalBucket(
+                        label: 'Approved',
+                        count: approved,
+                        color: Colors.green),
+                    _ApprovalBucket(
+                        label: 'Pending',
+                        count: pending,
+                        color: Colors.orange),
+                    _ApprovalBucket(
+                        label: 'Rejected',
+                        count: rejected,
+                        color: Colors.red),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ApprovalBucket extends StatelessWidget {
+  const _ApprovalBucket({
+    required this.label,
+    required this.count,
+    required this.color,
+  });
+
+  final String label;
+  final int count;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: Colors.grey[500]),
           ),
         ],
       ),

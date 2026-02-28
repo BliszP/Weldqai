@@ -26,6 +26,10 @@ class ReportCatalogScreen extends StatefulWidget {
 class _ReportCatalogScreenState extends State<ReportCatalogScreen> {
   late Future<List<_SchemaEntry>> _future;
 
+  /// Selected project filter when browsing the catalog globally (no widget.projectId).
+  /// null = show all custom templates.
+  String? _projectFilter;
+
   @override
   void initState() {
     super.initState();
@@ -74,12 +78,38 @@ class _ReportCatalogScreenState extends State<ReportCatalogScreen> {
             .collection('custom_schemas')
             .get();
 
+        // Collect distinct projectIds so we can resolve their names.
+        final projectIds = <String>{};
+        for (final doc in snapshot.docs) {
+          final pid = doc.data()['projectId'] as String?;
+          if (pid != null) projectIds.add(pid);
+        }
+
+        // Fetch project names from /users/{uid}/projects/.
+        final projectNames = <String, String>{};
+        for (final pid in projectIds) {
+          try {
+            final pdoc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .collection('projects')
+                .doc(pid)
+                .get();
+            if (pdoc.exists) {
+              projectNames[pid] = (pdoc.data()?['name'] as String?) ?? pid;
+            }
+          } catch (_) {}
+        }
+
         for (final doc in snapshot.docs) {
           final data = doc.data();
+          final pid = data['projectId'] as String?;
           out.add(_SchemaEntry(
             id: doc.id,
             title: (data['title'] as String?) ?? 'Untitled Template',
             isCustom: true,
+            projectId: pid,
+            projectName: pid != null ? (projectNames[pid] ?? pid) : null,
           ));
         }
       } catch (_) {}
@@ -766,6 +796,174 @@ class _ReportCatalogScreenState extends State<ReportCatalogScreen> {
     }
   }
 
+  // ── Custom template tile ────────────────────────────────────────────────
+
+  Widget _buildCustomTile(_SchemaEntry e) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      child: ListTile(
+        leading: const Icon(Icons.upload_file),
+        title: Text(e.title),
+        subtitle: Text(
+          [
+            e.id,
+            if (e.projectName != null) '• ${e.projectName}',
+          ].join(' '),
+          style: const TextStyle(fontSize: 12),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.content_copy, color: Colors.green),
+              tooltip: 'Duplicate template',
+              onPressed: () => _duplicateCustomSchema(e.id),
+            ),
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, color: Colors.blue),
+              tooltip: 'Edit template',
+              onPressed: () => _editCustomSchema(e.id),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              tooltip: 'Delete template',
+              onPressed: () => _deleteCustomSchema(e.id),
+            ),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
+        onTap: () => _openSchema(e),
+      ),
+    );
+  }
+
+  // ── Project-scoped list (opened from a project detail screen) ────────────
+  // Shows "For This Project" first, then collapses all others under "Other Templates".
+
+  List<Widget> _buildCustomScopedList(List<_SchemaEntry> custom, String projectId) {
+    final mine = custom.where((e) => e.projectId == projectId).toList();
+    final others = custom.where((e) => e.projectId != projectId).toList();
+
+    return [
+      if (mine.isNotEmpty) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 2),
+          child: Text(
+            'For This Project (${mine.length})',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.blueAccent,
+            ),
+          ),
+        ),
+        ...mine.map(_buildCustomTile),
+      ],
+      if (mine.isEmpty)
+        const Padding(
+          padding: EdgeInsets.fromLTRB(8, 4, 8, 8),
+          child: Text(
+            'No templates tagged to this project yet. Upload one using the button below.',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+          ),
+        ),
+      if (others.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Card(
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          clipBehavior: Clip.antiAlias,
+          child: ExpansionTile(
+            leading: const Icon(Icons.folder_open_outlined),
+            title: const Text('Other Templates',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text('${others.length} template${others.length == 1 ? '' : 's'}'),
+            initiallyExpanded: false,
+            childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            children: others.map(_buildCustomTile).toList(),
+          ),
+        ),
+      ],
+    ];
+  }
+
+  // ── Global view: project filter chips ────────────────────────────────────
+
+  Widget _buildProjectFilterChips(List<_SchemaEntry> custom) {
+    // Build a sorted map of projectId → projectName from the loaded schemas.
+    final projectMap = <String, String>{};
+    for (final e in custom) {
+      if (e.projectId != null) {
+        projectMap[e.projectId!] = e.projectName ?? e.projectId!;
+      }
+    }
+
+    if (projectMap.isEmpty) return const SizedBox.shrink();
+
+    final sortedEntries = projectMap.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+      child: Row(
+        spacing: 8,
+        children: [
+          FilterChip(
+            label: const Text('All'),
+            selected: _projectFilter == null,
+            onSelected: (_) => setState(() => _projectFilter = null),
+          ),
+          for (final entry in sortedEntries)
+            FilterChip(
+              avatar: const Icon(Icons.folder_outlined, size: 16),
+              label: Text(entry.value),
+              selected: _projectFilter == entry.key,
+              onSelected: (_) => setState(
+                () => _projectFilter =
+                    _projectFilter == entry.key ? null : entry.key,
+              ),
+            ),
+          FilterChip(
+            avatar: const Icon(Icons.label_off_outlined, size: 16),
+            label: const Text('Untagged'),
+            selected: _projectFilter == '__untagged__',
+            onSelected: (_) => setState(
+              () => _projectFilter =
+                  _projectFilter == '__untagged__' ? null : '__untagged__',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Global view: filtered custom list ─────────────────────────────────────
+
+  List<Widget> _buildFilteredCustomList(List<_SchemaEntry> custom) {
+    final List<_SchemaEntry> filtered;
+    if (_projectFilter == null) {
+      filtered = custom;
+    } else if (_projectFilter == '__untagged__') {
+      filtered = custom.where((e) => e.projectId == null).toList();
+    } else {
+      filtered = custom.where((e) => e.projectId == _projectFilter).toList();
+    }
+
+    if (filtered.isEmpty) {
+      return [
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            'No templates match this filter.',
+            style: TextStyle(color: Colors.grey),
+          ),
+        ),
+      ];
+    }
+
+    return filtered.map(_buildCustomTile).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -816,42 +1014,22 @@ class _ReportCatalogScreenState extends State<ReportCatalogScreen> {
                   const SizedBox(height: 16),
                   const Divider(),
                   const Padding(
-                    padding: EdgeInsets.all(8),
+                    padding: EdgeInsets.fromLTRB(8, 8, 8, 4),
                     child: Text('Custom Templates',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
-                  ...custom.map((e) => Card(
-                        child: ListTile(
-                          leading: const Icon(Icons.upload_file),
-                          title: Text(e.title),
-                          subtitle: Text(e.id),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // ✅ NEW: Duplicate Icon
-                              IconButton(
-                                icon: const Icon(Icons.content_copy, color: Colors.green),
-                                tooltip: 'Duplicate template',
-                                onPressed: () => _duplicateCustomSchema(e.id),
-                              ),
-                              // Edit Icon
-                              IconButton(
-                                icon: const Icon(Icons.edit_outlined, color: Colors.blue),
-                                tooltip: 'Edit template',
-                                onPressed: () => _editCustomSchema(e.id),
-                              ),
-                              // Delete Icon
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                tooltip: 'Delete template',
-                                onPressed: () => _deleteCustomSchema(e.id),
-                              ),
-                              const Icon(Icons.chevron_right),
-                            ],
-                          ),
-                          onTap: () => _openSchema(e),
-                        ),
-                      )),
+
+                  // ── Project-scoped view (opened from a Project) ────────────
+                  if (widget.projectId != null) ...[
+                    ..._buildCustomScopedList(custom, widget.projectId!),
+                  ]
+
+                  // ── Global view (project filter chips) ────────────────────
+                  else ...[
+                    _buildProjectFilterChips(custom),
+                    const SizedBox(height: 4),
+                    ..._buildFilteredCustomList(custom),
+                  ],
                 ],
               ],
             ),
@@ -860,6 +1038,7 @@ class _ReportCatalogScreenState extends State<ReportCatalogScreen> {
       ),
       floatingActionButton: TemplateUploadButton(
         heroTag: 'catalog_upload_fab',
+        projectId: widget.projectId,
         onSchemaGenerated: () {
           if (mounted) {
             setState(() {
@@ -877,10 +1056,14 @@ class _SchemaEntry {
   final String id;
   final String title;
   final bool isCustom;
+  final String? projectId;
+  final String? projectName;
 
   const _SchemaEntry({
     required this.id,
     required this.title,
     required this.isCustom,
+    this.projectId,
+    this.projectName,
   });
 }

@@ -405,7 +405,7 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
                     onNext: _next,
                   );
     
-                  final gap = isWide ? 16.0 : 12.0;
+                    final gap = isWide ? 16.0 : 12.0;
                   return ListView(
                     children: [
                       overview,
@@ -535,34 +535,29 @@ class _MainDrawer extends StatelessWidget {
               ),
             ),
 
-            // ── WORKSPACE ──────────────────────────────────────────────────
-            _DrawerSection(label: 'WORKSPACE', children: [
+            // ── MAIN ───────────────────────────────────────────────────────
+            _DrawerSection(label: 'MAIN', children: [
               ListTile(
                 leading: const Icon(Icons.home_outlined),
-                title: const Text('Dashboard'),
+                title: const Text('Home'),
                 onTap: () => _go(context, Paths.dashboard),
               ),
               ListTile(
                 leading: const Icon(Icons.folder_outlined),
                 title: const Text('Projects'),
+                subtitle: const Text('Select a project to start an inspection'),
                 onTap: () => _go(context, Paths.projects),
               ),
-            ]),
-
-            // ── REPORTS ────────────────────────────────────────────────────
-            // New inspections start inside a Project (project-first flow).
-            // This entry is read-only reference to browse existing reports.
-            _DrawerSection(label: 'REPORTS', children: [
               ListTile(
-                leading: const Icon(Icons.description_outlined),
-                title: const Text('All Inspections'),
-                subtitle: const Text('Browse reports across all schemas'),
+                leading: const Icon(Icons.inventory_2_outlined),
+                title: const Text('QC Catalog'),
+                subtitle: const Text('All built-in & custom report templates'),
                 onTap: () => _go(context, Paths.qcCatalog),
               ),
             ]),
 
-            // ── ANALYTICS ──────────────────────────────────────────────────
-            _DrawerSection(label: 'ANALYTICS', children: [
+            // ── INSIGHTS ───────────────────────────────────────────────────
+            _DrawerSection(label: 'INSIGHTS', children: [
               ListTile(
                 leading: const Icon(Icons.bar_chart_outlined),
                 title: const Text('KPI Dashboard'),
@@ -587,14 +582,20 @@ class _MainDrawer extends StatelessWidget {
             // ── SETTINGS ───────────────────────────────────────────────────
             _DrawerSection(label: 'SETTINGS', children: [
               ListTile(
+                leading: const Icon(Icons.manage_accounts_outlined),
+                title: const Text('Account Settings'),
+                onTap: () => _go(context, Paths.accountSettings),
+              ),
+              ListTile(
                 leading: const Icon(Icons.wifi_outlined),
                 title: const Text('Offline & Sync'),
                 onTap: () => _go(context, Paths.offline),
               ),
               ListTile(
-                leading: const Icon(Icons.manage_accounts_outlined),
-                title: const Text('Account Settings'),
-                onTap: () => _go(context, Paths.accountSettings),
+                leading: const Icon(Icons.history_edu_outlined),
+                title: const Text('Audit Log'),
+                subtitle: const Text('Tamper-evident activity trail'),
+                onTap: () => _go(context, Paths.auditLog),
               ),
             ]),
 

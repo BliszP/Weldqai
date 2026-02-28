@@ -79,6 +79,14 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
   String? _companyLogoUrl;
   String? _clientLogoUrl;
 
+  String? _certBody;
+  final _certNumberCtrl = TextEditingController();
+  final _certExpiryCtrl = TextEditingController();
+
+  static const _certBodies = [
+    'AWS', 'ASME', 'API', 'CSWIP', 'PCN', 'TWI', 'BGAS', 'AMPP', 'IIW',
+  ];
+
   final _auth = FirebaseAuth.instance;
   final _db = FirebaseFirestore.instance;
 
@@ -97,6 +105,8 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     _companyCtrl.dispose();
     _roleCtrl.dispose();
     _certCtrl.dispose();
+    _certNumberCtrl.dispose();
+    _certExpiryCtrl.dispose();
     _phoneCtrl.dispose();
     _addressCtrl.dispose();
     super.dispose();
@@ -126,6 +136,10 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
 
         _companyLogoUrl = (data['companyLogoUrl'] ?? '') as String?;
         _clientLogoUrl  = (data['clientLogoUrl']  ?? '') as String?;
+
+        _certBody = data['certBody'] as String?;
+        _certNumberCtrl.text = (data['certNumber'] ?? '').toString();
+        _certExpiryCtrl.text = (data['certExpiry'] ?? '').toString();
 
         _units = (prefs['units'] as String?) ?? _units;
         _language = (prefs['language'] as String?) ?? _language;
@@ -162,6 +176,11 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
         'phone': _phoneCtrl.text.trim(),
         'address': _addressCtrl.text.trim(),
         'certifications': _certCtrl.text.trim(),
+        'certBody':       _certBody,
+        'certNumber':     _certNumberCtrl.text.trim(),
+        'certExpiry':     _certExpiryCtrl.text.trim().isEmpty
+            ? null
+            : _certExpiryCtrl.text.trim(),
         'companyLogoUrl': _companyLogoUrl,
         'clientLogoUrl': _clientLogoUrl, 
         'prefs': {
@@ -350,6 +369,23 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     );
   }
 
+  Future<void> _pickCertExpiry() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now.add(const Duration(days: 365 * 3)),
+      firstDate: now,
+      lastDate: DateTime(now.year + 10),
+      helpText: 'Certificate expiry date',
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _certExpiryCtrl.text =
+            '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      });
+    }
+  }
+
   void _openUpgradeDialog() {
     showUpgradeOptionsDialog(context);
   }
@@ -358,9 +394,11 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         const gap = 12.0;
-        const minField = 180.0;
+        const minField = 220.0;
+        const maxCols = 3; // never more than 3 columns on any screen size
         final avail = constraints.maxWidth;
-        final cols = math.max(1, ((avail + gap) / (minField + gap)).floor());
+        final cols = math.max(
+            1, math.min(maxCols, ((avail + gap) / (minField + gap)).floor()));
         final cellW = (avail - (cols - 1) * gap) / cols;
 
         return Wrap(
@@ -380,115 +418,319 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     );
   }
 
+  // ── Subscription content (no Card wrapper — lives inside ExpansionTile) ──────
+
+  Widget _buildSubscriptionContent(SubscriptionStatus status) {
+    String title;
+    String subtitle;
+    Color? iconColor;
+    IconData icon;
+
+    switch (status.type) {
+      case SubscriptionType.trial:
+        icon = Icons.hourglass_empty;
+        iconColor = Colors.orange;
+        title = 'Free Trial';
+        subtitle = '${status.reportsRemaining} reports left • ${status.daysRemaining} days';
+        break;
+      case SubscriptionType.trialExpired:
+        icon = Icons.block;
+        iconColor = Colors.red;
+        title = 'Trial Ended';
+        subtitle = 'Upgrade to continue';
+        break;
+      case SubscriptionType.payPerReport:
+        icon = Icons.receipt_long;
+        iconColor = Colors.blue;
+        title = 'Pay Per Report';
+        subtitle = '${status.creditsRemaining} reports remaining';
+        break;
+      case SubscriptionType.monthlyIndividual:
+        icon = Icons.workspace_premium;
+        iconColor = Colors.green;
+        title = 'Individual Plan';
+        if (status.currentPeriodEnd != null) {
+          final renewDate = status.currentPeriodEnd!;
+          final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          final formattedDate = '${months[renewDate.month - 1]} ${renewDate.day}, ${renewDate.year}';
+          subtitle = status.cancelAtPeriodEnd == true
+              ? 'Access until $formattedDate'
+              : 'Renews $formattedDate for \$50.00';
+        } else {
+          subtitle = 'Unlimited reports';
+        }
+        break;
+      case SubscriptionType.team:
+        icon = Icons.groups;
+        iconColor = Colors.purple;
+        title = 'Team Plan';
+        subtitle = status.isTeamOwner == true ? 'Team Owner' : 'Team Member';
+        break;
+      default:
+        icon = Icons.help_outline;
+        iconColor = null;
+        title = 'Unknown';
+        subtitle = 'Tap to upgrade';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(icon, color: iconColor),
+          title: Text(title),
+          subtitle: Text(subtitle),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _openUpgradeDialog,
+        ),
+        if (status.type == SubscriptionType.monthlyIndividual) ...[
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Column(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.settings),
+                    label: const Text('Manage Subscription'),
+                    onPressed: () async {
+                      try {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Row(
+                              children: [
+                                SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                                SizedBox(width: 16),
+                                Text('Opening billing portal...'),
+                              ],
+                            ),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                        final callable = FirebaseFunctions.instance
+                            .httpsCallable('createBillingPortalSession');
+                        final result = await callable.call();
+                        final portalUrl = result.data['url'] as String;
+                        await launchUrl(
+                          Uri.parse(portalUrl),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to open portal: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Cancel anytime, update payment method, or view billing history',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final body = _loading
-        ? const Center(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: CircularProgressIndicator(),
-            ),
-          )
-        : ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _sectionTitle(context, 'Profile'),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: _profileGrid(),
+    if (_loading) {
+      return const Scaffold(
+        appBar: null,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Account Settings')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        children: [
+
+          // ── Profile ─────────────────────────────────────────────────────
+          _SettingsSection(
+            title: 'Profile',
+            icon: Icons.person_outlined,
+            initiallyExpanded: true,
+            child: _profileGrid(),
+          ),
+
+          // ── My Certification ────────────────────────────────────────────
+          _SettingsSection(
+            title: 'My Certification (PDF stamp)',
+            icon: Icons.badge_outlined,
+            subtitle: _certBody != null
+                ? '$_certBody · ${_certNumberCtrl.text.isEmpty ? 'no number' : _certNumberCtrl.text}'
+                : 'Not set — tap to configure',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your personal CWI, CSWIP, PCN or equivalent. Printed on all PDF '
+                  'exports from this account. To stamp a different inspector on a '
+                  'specific report, add them under Team Inspectors.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
-              ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _certBody,
+                  decoration: const InputDecoration(
+                    labelText: 'Certifying body',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _certBodies
+                      .map((b) => DropdownMenuItem(value: b, child: Text(b)))
+                      .toList(),
+                  onChanged: (v) => setState(() => _certBody = v),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _certNumberCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Certificate number',
+                    hintText: 'e.g. CWI-123456',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _certExpiryCtrl,
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    labelText: 'Expiry date',
+                    hintText: 'yyyy-MM-dd',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.calendar_today_outlined),
+                      onPressed: _pickCertExpiry,
+                    ),
+                  ),
+                  onTap: _pickCertExpiry,
+                ),
+              ],
+            ),
+          ),
 
-              const SizedBox(height: 16),
-              _sectionTitle(context, 'Branding'),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
+          // ── Team Inspectors ─────────────────────────────────────────────
+          _SettingsSection(
+            title: 'Team Inspectors',
+            icon: Icons.group_outlined,
+            subtitle: 'Manage inspectors who work under this account',
+            child: _TeamInspectorsSection(userId: widget.userId),
+          ),
+
+          // ── Branding ────────────────────────────────────────────────────
+          _SettingsSection(
+            title: 'Branding',
+            icon: Icons.image_outlined,
+            subtitle: 'Company & client logos printed on PDF exports',
+            child: Column(
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: _logoPreview(_companyLogoUrl),
+                  title: const Text('Company Logo'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ListTile(
-                        leading: _logoPreview(_companyLogoUrl),
-                        title: const Text('Company Logo'),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Shown on exported reports'),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                TextButton.icon(
-                                  onPressed: _pickCompanyLogo,
-                                  icon: const Icon(Icons.upload),
-                                  label: Text(_companyLogoUrl == null ? 'Upload' : 'Change'),
-                                ),
-                                if (_companyLogoUrl != null)
-                                  TextButton.icon(
-                                    onPressed: _removeCompanyLogo,
-                                    icon: const Icon(Icons.delete_outline),
-                                    label: const Text('Remove'),
-                                  ),
-                                if (_companyLogoUrl != null)
-                                  TextButton.icon(
-                                    onPressed: () => _previewUrl(_companyLogoUrl, title: 'Company Logo'),
-                                    icon: const Icon(Icons.visibility_outlined),
-                                    label: const Text('Preview'),
-                                  ),
-                              ],
+                      const Text('Shown on exported reports'),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          TextButton.icon(
+                            onPressed: _pickCompanyLogo,
+                            icon: const Icon(Icons.upload),
+                            label: Text(_companyLogoUrl == null ? 'Upload' : 'Change'),
+                          ),
+                          if (_companyLogoUrl != null)
+                            TextButton.icon(
+                              onPressed: _removeCompanyLogo,
+                              icon: const Icon(Icons.delete_outline),
+                              label: const Text('Remove'),
                             ),
-                          ],
-                        ),
-                        isThreeLine: true,
-                      ),
-
-                      const Divider(height: 24),
-
-                      ListTile(
-                        leading: _logoPreview(_clientLogoUrl),
-                        title: const Text('Client Logo'),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Shown on exported reports (right side)'),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                TextButton.icon(
-                                  onPressed: _pickClientLogo,
-                                  icon: const Icon(Icons.upload),
-                                  label: Text(_clientLogoUrl == null ? 'Upload' : 'Change'),
-                                ),
-                                if (_clientLogoUrl != null)
-                                  TextButton.icon(
-                                    onPressed: _removeClientLogo,
-                                    icon: const Icon(Icons.delete_outline),
-                                    label: const Text('Remove'),
-                                  ),
-                                if (_clientLogoUrl != null)
-                                  TextButton.icon(
-                                    onPressed: () => _previewUrl(_clientLogoUrl, title: 'Client Logo'),
-                                    icon: const Icon(Icons.visibility_outlined),
-                                    label: const Text('Preview'),
-                                  ),
-                              ],
+                          if (_companyLogoUrl != null)
+                            TextButton.icon(
+                              onPressed: () => _previewUrl(_companyLogoUrl, title: 'Company Logo'),
+                              icon: const Icon(Icons.visibility_outlined),
+                              label: const Text('Preview'),
                             ),
-                          ],
-                        ),
-                        isThreeLine: true,
+                        ],
                       ),
                     ],
                   ),
+                  isThreeLine: true,
                 ),
-              ),
+                const Divider(height: 24),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: _logoPreview(_clientLogoUrl),
+                  title: const Text('Client Logo'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Shown on exported reports (right side)'),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          TextButton.icon(
+                            onPressed: _pickClientLogo,
+                            icon: const Icon(Icons.upload),
+                            label: Text(_clientLogoUrl == null ? 'Upload' : 'Change'),
+                          ),
+                          if (_clientLogoUrl != null)
+                            TextButton.icon(
+                              onPressed: _removeClientLogo,
+                              icon: const Icon(Icons.delete_outline),
+                              label: const Text('Remove'),
+                            ),
+                          if (_clientLogoUrl != null)
+                            TextButton.icon(
+                              onPressed: () => _previewUrl(_clientLogoUrl, title: 'Client Logo'),
+                              icon: const Icon(Icons.visibility_outlined),
+                              label: const Text('Preview'),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  isThreeLine: true,
+                ),
+              ],
+            ),
+          ),
 
-              const SizedBox(height: 16),
-              _sectionTitle(context, 'Preferences'),
-              Card(
-                child: SwitchListTile.adaptive(
+          // ── Preferences ─────────────────────────────────────────────────
+          _SettingsSection(
+            title: 'Preferences',
+            icon: Icons.tune_outlined,
+            subtitle: '${_darkMode ? 'Dark' : 'Light'} mode · '
+                '${_units == 'metric' ? 'Metric (mm/°C)' : 'Imperial (in/°F)'}',
+            child: Column(
+              children: [
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
                   value: _darkMode,
                   onChanged: (v) {
                     setState(() => _darkMode = v);
@@ -496,9 +738,8 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
                   },
                   title: const Text('Dark Mode'),
                 ),
-              ),
-              Card(
-                child: ListTile(
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
                   title: const Text('Units / Language'),
                   subtitle: Text(
                     '${_units == "metric" ? "mm / °C" : "inch / °F"} • ${_language.toUpperCase()}',
@@ -522,214 +763,95 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
                     }
                   },
                 ),
-              ),
+              ],
+            ),
+          ),
 
-              const SizedBox(height: 16),
-              _sectionTitle(context, 'Offline & Sync'),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.offline_bolt),
-                  title: const Text('Offline & Sync'),
-                  subtitle: const Text('Manage offline access, sync status and settings'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.pushNamed(context, Paths.offline),
-                ),
-              ),
+          // ── Offline & Sync (nav — no expand needed) ─────────────────────
+          Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              leading: const Icon(Icons.offline_bolt),
+              title: const Text('Offline & Sync',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: const Text('Manage offline access and sync settings'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pushNamed(context, Paths.offline),
+            ),
+          ),
 
-              const SizedBox(height: 16),
-              _sectionTitle(context, 'Subscription'),
-              ref.watch(subscriptionStatusProvider).when(
-                loading: () => const Card(
-                  child: ListTile(
+          // ── Subscription ────────────────────────────────────────────────
+          Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            clipBehavior: Clip.antiAlias,
+            child: ExpansionTile(
+              leading: const Icon(Icons.workspace_premium),
+              title: const Text('Subscription',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              initiallyExpanded: true,
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              expandedCrossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ref.watch(subscriptionStatusProvider).when(
+                  loading: () => const ListTile(
+                    contentPadding: EdgeInsets.zero,
                     leading: Icon(Icons.workspace_premium),
                     title: Text('Loading...'),
                   ),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: _buildSubscriptionContent,
                 ),
-                error: (_, __) => const SizedBox.shrink(),
-                data: (status) {
-                  String title;
-                  String subtitle;
-                  Color? iconColor;
-                  IconData icon;
+              ],
+            ),
+          ),
 
-                  switch (status.type) {
-                    case SubscriptionType.trial:
-                      icon = Icons.hourglass_empty;
-                      iconColor = Colors.orange;
-                      title = 'Free Trial';
-                      subtitle = '${status.reportsRemaining} reports left • ${status.daysRemaining} days';
-                      break;
-                    case SubscriptionType.trialExpired:
-                      icon = Icons.block;
-                      iconColor = Colors.red;
-                      title = 'Trial Ended';
-                      subtitle = 'Upgrade to continue';
-                      break;
-                    case SubscriptionType.payPerReport:
-                      icon = Icons.receipt_long;
-                      iconColor = Colors.blue;
-                      title = 'Pay Per Report';
-                      subtitle = '${status.creditsRemaining} reports remaining';
-                      break;
-                    case SubscriptionType.monthlyIndividual:
-                      icon = Icons.workspace_premium;
-                      iconColor = Colors.green;
-                      title = 'Individual Plan';
-                      if (status.currentPeriodEnd != null) {
-                        final renewDate = status.currentPeriodEnd!;
-                        final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                        final formattedDate = '${months[renewDate.month - 1]} ${renewDate.day}, ${renewDate.year}';
-                        subtitle = status.cancelAtPeriodEnd == true
-                            ? 'Access until $formattedDate'
-                            : 'Renews $formattedDate for \$50.00';
-                      } else {
-                        subtitle = 'Unlimited reports';
-                      }
-                      break;
-                    case SubscriptionType.team:
-                      icon = Icons.groups;
-                      iconColor = Colors.purple;
-                      title = 'Team Plan';
-                      subtitle = status.isTeamOwner == true ? 'Team Owner' : 'Team Member';
-                      break;
-                    default:
-                      icon = Icons.help_outline;
-                      iconColor = null;
-                      title = 'Unknown';
-                      subtitle = 'Tap to upgrade';
-                  }
+          // ── Security ────────────────────────────────────────────────────
+          _SettingsSection(
+            title: 'Security',
+            icon: Icons.lock_outline,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.lock_outline),
+              title: const Text('Change Password'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => showChangePasswordSheet(context),
+            ),
+          ),
 
-                  return Card(
-                    child: Column(
-                      children: [
-                        ListTile(
-                          leading: Icon(icon, color: iconColor),
-                          title: Text(title),
-                          subtitle: Text(subtitle),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: _openUpgradeDialog,
-                        ),
-                        if (status.type == SubscriptionType.monthlyIndividual) ...[
-                          const Divider(height: 1),
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              children: [
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    icon: const Icon(Icons.settings),
-                                    label: const Text('Manage Subscription'),
-                                    onPressed: () async {
-                                      try {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Row(
-                                              children: [
-                                                SizedBox(
-                                                  width: 20,
-                                                  height: 20,
-                                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                                ),
-                                                SizedBox(width: 16),
-                                                Text('Opening billing portal...'),
-                                              ],
-                                            ),
-                                            duration: Duration(seconds: 2),
-                                          ),
-                                        );
-                                        final callable = FirebaseFunctions.instance
-                                            .httpsCallable('createBillingPortalSession');
-                                        final result = await callable.call();
-                                        final portalUrl = result.data['url'] as String;
-                                        await launchUrl(
-                                          Uri.parse(portalUrl),
-                                          mode: LaunchMode.externalApplication,
-                                        );
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text('Failed to open portal: $e'),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
-                                        }
-                                      }
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Cancel anytime, update payment method, or view billing history',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 16),
-              _sectionTitle(context, 'Security'),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.lock_outline),
-                  title: const Text('Change Password'),
-                  onTap: () => showChangePasswordSheet(context),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _saving ? null : _saveAll,
-                      icon: _saving
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save_outlined),
-                      label: const Text('Save Settings'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: TextButton.icon(
-                  onPressed: () async {
-                    final nav = Navigator.of(context);
-                    await _auth.signOut();
-                    if (!mounted) return;
-                    nav.pushReplacementNamed('/auth');
-                  },
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Logout'),
-                ),
-              ),
-            ],
-          );
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Account Settings')),
-      body: body,
+          // ── Actions ─────────────────────────────────────────────────────
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _saving ? null : _saveAll,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: const Text('Save Settings'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: TextButton.icon(
+              onPressed: () async {
+                final nav = Navigator.of(context);
+                await _auth.signOut();
+                if (!mounted) return;
+                nav.pushReplacementNamed('/auth');
+              },
+              icon: const Icon(Icons.logout),
+              label: const Text('Logout'),
+            ),
+          ),
+        ],
+      ),
     );
   }
-
-  Widget _sectionTitle(BuildContext ctx, String s) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Text(s, style: Theme.of(ctx).textTheme.titleLarge),
-      );
 
   Widget _logoPreview(String? url) {
     if (url == null || url.isEmpty) {
@@ -750,6 +872,52 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     );
   }
 }
+
+// ── _SettingsSection ──────────────────────────────────────────────────────────
+// Collapsible Card+ExpansionTile used for every settings group.
+
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({
+    required this.title,
+    required this.icon,
+    required this.child,
+    this.subtitle,
+    this.initiallyExpanded = false,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget child;
+  final String? subtitle;
+  final bool initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        leading: Icon(icon),
+        title: Text(title,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: subtitle != null
+            ? Text(
+                subtitle!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12),
+              )
+            : null,
+        initiallyExpanded: initiallyExpanded,
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: [child],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _Field extends StatelessWidget {
   const _Field({
@@ -991,6 +1159,273 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Team Inspectors Section
+//
+// Manages additional inspector profiles stored at:
+//   /users/{uid}/inspector_profiles/{profileId}
+//
+// Each profile captures the name, certifying body, certificate number, and
+// expiry date of an inspector who works under this account.  Profiles can
+// be selected per-report so the correct cert is stamped on the PDF export.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _TeamInspectorsSection extends StatelessWidget {
+  const _TeamInspectorsSection({required this.userId});
+  final String userId;
+
+  CollectionReference<Map<String, dynamic>> get _col =>
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('inspector_profiles');
+
+  Future<void> _addProfile(BuildContext context) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => const _InspectorProfileDialog(),
+    );
+    if (result == null) return;
+    await _col.add({
+      ...result,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> _deleteProfile(
+      BuildContext context, String docId, String name) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove Inspector?'),
+        content: Text('Remove "$name" from Team Inspectors?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await _col.doc(docId).delete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _col.orderBy('createdAt').snapshots(),
+      builder: (context, snap) {
+        final docs = snap.data?.docs ?? [];
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add inspectors who work under this account. Their certification '
+                  'can be stamped on reports they perform — separate from the account '
+                  'owner\'s personal cert above.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant),
+                ),
+                const SizedBox(height: 12),
+
+                if (docs.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'No additional inspectors yet.',
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                    ),
+                  )
+                else
+                  ...docs.map((doc) {
+                    final d          = doc.data();
+                    final name       = d['name']       as String? ?? '';
+                    final certBody   = d['certBody']   as String? ?? '';
+                    final certNumber = d['certNumber'] as String? ?? '';
+                    final certExpiry = d['certExpiry'] as String? ?? '';
+                    final certLabel  = [
+                      if (certBody.isNotEmpty)   certBody,
+                      if (certNumber.isNotEmpty) certNumber,
+                      if (certExpiry.isNotEmpty) 'exp. $certExpiry',
+                    ].join(' · ');
+
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        backgroundColor: cs.primaryContainer,
+                        child: Text(
+                          name.isNotEmpty ? name[0].toUpperCase() : '?',
+                          style: TextStyle(
+                            color: cs.onPrimaryContainer,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      title: Text(name,
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: certLabel.isNotEmpty
+                          ? Text(certLabel,
+                              style: const TextStyle(fontSize: 12))
+                          : null,
+                      trailing: IconButton(
+                        icon:
+                            const Icon(Icons.delete_outlined, color: Colors.red),
+                        tooltip: 'Remove inspector',
+                        onPressed: () =>
+                            _deleteProfile(context, doc.id, name),
+                      ),
+                    );
+                  }),
+
+                const SizedBox(height: 4),
+                OutlinedButton.icon(
+                  onPressed: () => _addProfile(context),
+                  icon: const Icon(Icons.person_add_outlined),
+                  label: const Text('Add Inspector'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Add-inspector dialog ───────────────────────────────────────────────────
+
+class _InspectorProfileDialog extends StatefulWidget {
+  const _InspectorProfileDialog();
+
+  @override
+  State<_InspectorProfileDialog> createState() =>
+      _InspectorProfileDialogState();
+}
+
+class _InspectorProfileDialogState extends State<_InspectorProfileDialog> {
+  static const _certBodies = [
+    'AWS', 'ASME', 'API', 'CSWIP', 'PCN', 'TWI', 'BGAS', 'AMPP', 'IIW',
+  ];
+
+  final _nameCtrl       = TextEditingController();
+  final _certNumberCtrl = TextEditingController();
+  final _certExpiryCtrl = TextEditingController();
+  String? _certBody;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _certNumberCtrl.dispose();
+    _certExpiryCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickExpiry() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 365)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2040),
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _certExpiryCtrl.text =
+            '${picked.year}-${picked.month.toString().padLeft(2, '0')}-'
+            '${picked.day.toString().padLeft(2, '0')}';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Inspector'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Full name *',
+                hintText: 'e.g. John Smith',
+                border: OutlineInputBorder(),
+              ),
+              textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _certBody,
+              decoration: const InputDecoration(
+                labelText: 'Certifying body',
+                border: OutlineInputBorder(),
+              ),
+              items: _certBodies
+                  .map((b) => DropdownMenuItem(value: b, child: Text(b)))
+                  .toList(),
+              onChanged: (v) => setState(() => _certBody = v),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _certNumberCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Certificate number',
+                hintText: 'e.g. CWI-123456',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _certExpiryCtrl,
+              readOnly: true,
+              decoration: InputDecoration(
+                labelText: 'Expiry date',
+                hintText: 'yyyy-MM-dd',
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.calendar_today_outlined),
+                  onPressed: _pickExpiry,
+                ),
+              ),
+              onTap: _pickExpiry,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel')),
+        FilledButton(
+          onPressed: () {
+            final name = _nameCtrl.text.trim();
+            if (name.isEmpty) return;
+            Navigator.pop(context, {
+              'name':       name,
+              'certBody':   _certBody,
+              'certNumber': _certNumberCtrl.text.trim(),
+              'certExpiry': _certExpiryCtrl.text.trim().isEmpty
+                  ? null
+                  : _certExpiryCtrl.text.trim(),
+            });
+          },
+          child: const Text('Add'),
+        ),
+      ],
     );
   }
 }
