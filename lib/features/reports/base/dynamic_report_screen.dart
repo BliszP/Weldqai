@@ -19,6 +19,7 @@ class DynamicReportScreen extends StatefulWidget {
     required this.schemaTitle,
     this.defaultMinRowsOverride,
     this.reportId,
+    this.projectId,
   });
 
   final String userId;
@@ -26,6 +27,7 @@ class DynamicReportScreen extends StatefulWidget {
   final String schemaTitle;
   final int? defaultMinRowsOverride;
   final String? reportId;
+  final String? projectId;
 
   @override
   State<DynamicReportScreen> createState() => _DynamicReportScreenState();
@@ -142,6 +144,7 @@ class _DynamicReportScreenState extends State<DynamicReportScreen> {
             scanService: _scan,
             repo: _repo,
             reportId: widget.reportId,
+            projectId: widget.projectId,
           ),
           // ❌ REMOVED: floatingActionButton
           // ❌ REMOVED: floatingActionButtonLocation

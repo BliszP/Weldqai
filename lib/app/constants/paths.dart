@@ -25,4 +25,9 @@ class Paths {
 
   // Offline mode
   static const String offline = '/offline';
+
+  // Projects
+  static const String projects      = '/projects';
+  static const String createProject = '/projects/create';
+  static const String projectDetail = '/projects/detail';
 }

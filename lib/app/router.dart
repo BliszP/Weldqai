@@ -24,6 +24,10 @@ import 'package:weldqai_app/core/repositories/user_data_repository.dart';
 import 'package:weldqai_app/core/repositories/metrics_repository.dart';
 import 'package:weldqai_app/features/notifications/notifications_screen.dart';
 import 'package:weldqai_app/features/offline/offline_mode_screen.dart';
+import 'package:weldqai_app/features/sharing/share_access_screen.dart';
+import 'package:weldqai_app/features/projects/projects_list_screen.dart';
+import 'package:weldqai_app/features/projects/create_project_screen.dart';
+import 'package:weldqai_app/features/projects/project_detail_screen.dart';
 
 final UserDataRepository _userDataRepo = UserDataRepository();
 final MetricsRepository _metricsRepo = MetricsRepository();
@@ -153,7 +157,8 @@ case Paths.qcCatalog: {
     settings: settings,
     builder: (context) {
       final workspace = Provider.of<WorkspaceProvider>(context, listen: false).activeWorkspace;
-      return ReportCatalogScreen(userId: workspace);
+      final projectId = args['projectId'] as String?;
+      return ReportCatalogScreen(userId: workspace, projectId: projectId);
     },
   );
 }
@@ -161,21 +166,22 @@ case Paths.qcCatalog: {
 case Paths.dynamicReport: {
   final String schemaId = (args['schemaId'] ?? 'welding_operation').toString();
   final String schemaTitle = (args['schemaTitle'] ?? 'Welding Operation').toString();
-  final String? reportId = args['reportId'] as String?; // ✅ Extract reportId from args
-  
+  final String? reportId = args['reportId'] as String?;
+  final String? projectId = args['projectId'] as String?;
+
   return MaterialPageRoute(
     settings: settings,
     builder: (context) {
-      // ✅ Get workspace from args first, then fallback to provider
-      final workspace = args['userId'] as String? ?? 
-                       args['workspace'] as String? ?? 
+      final workspace = args['userId'] as String? ??
+                       args['workspace'] as String? ??
                        Provider.of<WorkspaceProvider>(context, listen: false).activeWorkspace;
-      
+
       return DynamicReportScreen(
         userId: workspace,
         schemaId: schemaId,
         schemaTitle: schemaTitle,
-        reportId: reportId, // ✅ Pass reportId to screen
+        reportId: reportId,
+        projectId: projectId,
       );
     },
   );
@@ -234,16 +240,11 @@ case Paths.chat: {
 }
 
 // ----------------- Collaboration ----------------
-case Paths.collaboration: {
-  final userId = _getCurrentUserId()!;
+case Paths.collaboration:
   return MaterialPageRoute(
-    builder: (context) => Scaffold(
-      appBar: AppBar(title: const Text('Collaboration')),
-      body: Center(child: Text('Collaboration for user: $userId')),
-    ),
     settings: settings,
+    builder: (_) => const ShareAccessScreen(),
   );
-}
 
 // ----------------- Account Settings --------------
       // ----------------- Account Settings --------------
@@ -262,6 +263,38 @@ case Paths.collaboration: {
           settings: settings,
           builder: (_) => const OfflineModeScreen(),
         );
+
+      // ----------------- Projects list -----------------
+      case Paths.projects: {
+        final userId = _getCurrentUserId()!;
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => ProjectsListScreen(userId: userId),
+        );
+      }
+
+      // ----------------- Create / edit project ---------
+      case Paths.createProject:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const CreateProjectScreen(),
+          fullscreenDialog: true,
+        );
+
+      // ----------------- Project detail ----------------
+      case Paths.projectDetail: {
+        final userId    = _getCurrentUserId()!;
+        final projectId = args['projectId'] as String;
+        final project   = args['project']   as Map<String, dynamic>;
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => ProjectDetailScreen(
+            userId:    userId,
+            projectId: projectId,
+            project:   project,
+          ),
+        );
+      }
 
       // ----------------- Fallback ----------------------
       default:

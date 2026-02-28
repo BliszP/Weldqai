@@ -4,6 +4,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';  // ✅ ADD THIS LINE
+import 'package:weldqai_app/core/repositories/project_repository.dart';
 import 'package:weldqai_app/core/services/analytics_service.dart';
 import 'package:weldqai_app/core/services/subscription_service.dart';
 import 'package:weldqai_app/core/services/logger_service.dart';
@@ -185,6 +186,15 @@ if (isNewReport && !skipSubscriptionCheck) {  // ✅ ADDED && !skipSubscriptionC
 if (isNewReport && !skipSubscriptionCheck) {  // ✅ ADDED && !skipSubscriptionCheck
   await _subscriptionService.trackReportCreation();
 }
+
+    // Increment denormalised reportCount on the linked project (fire-and-forget;
+    // errors are swallowed inside incrementReportCount so they never block saves).
+    if (isNewReport) {
+      final projectId = payload['projectId'] as String?;
+      if (projectId != null && projectId.isNotEmpty) {
+        await ProjectRepository().incrementReportCount(uid, projectId);
+      }
+    }
 
     return id;
   }

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 class AppTheme {
 static ThemeData light() {
   final scheme = ColorScheme.fromSeed(
-    seedColor: const Color(0xFF1565C0),
+    seedColor: const Color(0xFF1E3A5F),
     brightness: Brightness.light,
     // Add this to override the auto-generated surface color:
     surface: const Color(0xFFF0F2F5),
@@ -105,7 +105,7 @@ static ThemeData light() {
 
   static ThemeData dark() {
   final scheme = ColorScheme.fromSeed(
-    seedColor: const Color(0xFF1565C0),
+    seedColor: const Color(0xFF1E3A5F),
     brightness: Brightness.dark,
     surface: const Color(0xFF1A1C1E), // Dark surface override
   );

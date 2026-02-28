@@ -10,8 +10,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:weldqai_app/app/constants/paths.dart';
 import 'package:weldqai_app/core/services/theme_controller.dart';
-import 'package:weldqai_app/core/services/sync_service.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:firebase_performance/firebase_performance.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -71,7 +71,6 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
 
   bool _loading = true;
   bool _saving = false;
-  bool _syncing = false;
 
   bool _darkMode = ThemeController.i.isDark;
   String _units = 'metric';
@@ -80,12 +79,8 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
   String? _companyLogoUrl;
   String? _clientLogoUrl;
 
-  bool _offline = true;
-  String? _lastSync;
-
   final _auth = FirebaseAuth.instance;
   final _db = FirebaseFirestore.instance;
-  final _sync = SyncService();
 
   String? get _uid => _auth.currentUser?.uid;
 
@@ -136,50 +131,10 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
         _language = (prefs['language'] as String?) ?? _language;
       }
 
-      _offline = await _sync.offlineEnabled();
-      _lastSync = await _sync.lastSyncedAt();
     } catch (_) {
       // Keep defaults on error
     } finally {
       if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _syncNow() async {
-    if (_uid == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Not signed in')),
-        );
-      }
-      return;
-    }
-
-    setState(() => _syncing = true);
-    try {
-      final count = await _sync.syncForCurrentUser();
-      final last = await _sync.lastSyncedAt();
-      
-      if (mounted) {
-        setState(() => _lastSync = last);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Synced $count items for offline use'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Sync failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _syncing = false);
     }
   }
 
@@ -216,8 +171,6 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
         },
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-
-      await _sync.enableOffline(_offline);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -427,34 +380,6 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     );
   }
 
-  Widget _buildSyncSubtitle() {
-    if (_lastSync == null) {
-      return const Text('Never synced - Tap to sync for offline use');
-    }
-    
-    try {
-      final date = DateTime.parse(_lastSync!);
-      final diff = DateTime.now().difference(date);
-      
-      String timeAgo;
-      if (diff.inMinutes < 1) {
-        timeAgo = 'Just now';
-      } else if (diff.inHours < 1) {
-        timeAgo = '${diff.inMinutes} minute${diff.inMinutes == 1 ? '' : 's'} ago';
-      } else if (diff.inDays < 1) {
-        timeAgo = '${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
-      } else if (diff.inDays < 7) {
-        timeAgo = '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
-      } else {
-        timeAgo = 'Over a week ago';
-      }
-      
-      return Text('Last synced: $timeAgo');
-    } catch (_) {
-      return Text('Last synced: $_lastSync');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final body = _loading
@@ -602,44 +527,12 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
               const SizedBox(height: 16),
               _sectionTitle(context, 'Offline & Sync'),
               Card(
-                child: Column(
-                  children: [
-                    SwitchListTile.adaptive(
-                      value: _offline,
-                      onChanged: (v) => setState(() => _offline = v),
-                      title: const Text('Offline Mode'),
-                      subtitle: const Text('Cache data locally and queue changes when offline'),
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.sync),
-                      title: const Text('Sync Now'),
-                      subtitle: _buildSyncSubtitle(),
-                      trailing: _syncing
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.chevron_right),
-                      onTap: _syncing ? null : _syncNow,
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline, size: 16, color: Colors.grey),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Syncing downloads your reports, templates, and dashboard data for offline access',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                child: ListTile(
+                  leading: const Icon(Icons.offline_bolt),
+                  title: const Text('Offline & Sync'),
+                  subtitle: const Text('Manage offline access, sync status and settings'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.pushNamed(context, Paths.offline),
                 ),
               ),
 

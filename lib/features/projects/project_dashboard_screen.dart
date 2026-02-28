@@ -13,8 +13,7 @@ import 'package:weldqai_app/core/providers/subscription_providers.dart';
 import 'package:weldqai_app/core/services/subscription_service.dart';
 import 'package:weldqai_app/features/account/widgets/upgrade_options_dialog.dart';
 import 'package:weldqai_app/core/providers/connectivity_provider.dart';
-import 'package:weldqai_app/core/services/sync_service.dart';
-import 'package:weldqai_app/features/offline/widgets/sync_banner.dart';
+import 'package:weldqai_app/core/repositories/report_repository.dart';
 
 
 /// ---------- Loader typedefs (Futures required; Streams optional) ----------
@@ -103,6 +102,8 @@ enum _DashMenu { account, signOut }
 
 class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen> {
   int _page = 1;
+  late Future<Map<String, dynamic>?> _lastReportF;
+  int _navIndex = 0;
 
   Future<Map<String, dynamic>>           get _summaryF  => widget.loadSummary();
   Future<List<Map<String, dynamic>>>     get _queueF    => widget.loadQueuePage();
@@ -121,6 +122,39 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
     if (uid != null) {
       initPush(uid); // from lib/core/services/push_service.dart
     }
+    _lastReportF = _loadLastReport();
+  }
+
+  /// Queries the 4 primary schemas in parallel and returns the most recently
+  /// updated report across all of them (used for the "Continue" shortcut card).
+  Future<Map<String, dynamic>?> _loadLastReport() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+    final repo = ReportRepository();
+    const schemas = [
+      'welding_operation',
+      'visual_inspection',
+      'ndt_rt',
+      'ndt_ut',
+      'ndt_mpi',
+      'structural_fillet',
+      'repairs',
+    ];
+    final results = await Future.wait(
+      schemas.map((s) => repo.loadLatestItem(userId: uid, schemaId: s)
+          .catchError((_) => null)),
+    );
+    // Pick the one with the latest updatedAtText (ISO string sorts lexicographically).
+    Map<String, dynamic>? best;
+    for (final r in results) {
+      if (r == null) continue;
+      final rTime = (r['updatedAtText'] as String? ?? '');
+      final bTime = (best?['updatedAtText'] as String? ?? '');
+      if (best == null || rTime.compareTo(bTime) > 0) {
+        best = r;
+      }
+    }
+    return best;
   }
 
   @override
@@ -171,6 +205,61 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
     return const SizedBox.shrink();
   },
 ),
+    // Compact connectivity dot
+    Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: ref.watch(connectivityProvider).when(
+        data: (online) => Tooltip(
+          message: online ? 'Online' : 'Offline — changes will sync',
+          child: Container(
+            width: 8, height: 8,
+            decoration: BoxDecoration(
+              color: online ? Colors.green : Colors.orange,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        loading: () => const SizedBox(width: 8, height: 8),
+        error: (_, __) => const SizedBox(width: 8, height: 8),
+      ),
+    ),
+    // Trial status chip — only shown during trial/expired
+    ref.watch(subscriptionStatusProvider).when(
+      data: (status) {
+        if (status.type != SubscriptionType.trial &&
+            status.type != SubscriptionType.trialExpired) {
+          return const SizedBox.shrink();
+        }
+        final isExpired = status.type == SubscriptionType.trialExpired;
+        final remaining = status.reportsRemaining ?? 0;
+        return GestureDetector(
+          onTap: () => showUpgradeOptionsDialog(context),
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: isExpired ? Colors.red.withValues(alpha: 0.15)
+                  : Colors.amber.withValues(alpha: 0.20),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isExpired ? Colors.red : Colors.amber,
+                width: 1,
+              ),
+            ),
+            child: Text(
+              isExpired ? 'Expired' : '$remaining left',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isExpired ? Colors.red : Colors.amber.shade800,
+              ),
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    ),
     _NotificationsBell(uid: widget.userId),
     IconButton(
       tooltip: 'Share & Access',
@@ -215,66 +304,61 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
 ),
 
       body: SafeArea(
-        child: Column(  // ✅ CHANGED: Wrap in Column
+        child: Column(
           children: [
-      // Trial banner — sourced from the shared Riverpod subscription provider.
-      ref.watch(subscriptionStatusProvider).when(
-        data: (status) {
-          if (status.type != SubscriptionType.trial &&
-              status.type != SubscriptionType.trialExpired) {
-            return const SizedBox.shrink();
+      // "Continue Last Report" shortcut — hidden when no prior reports exist.
+      FutureBuilder<Map<String, dynamic>?>(
+        future: _lastReportF,
+        builder: (context, snap) {
+          final report = snap.data;
+          if (report == null) return const SizedBox.shrink();
+          final schemaId = report['schemaId'] as String? ?? '';
+          final reportId = report['id'] as String? ?? '';
+          final updatedAt = report['updatedAtText'] as String?;
+          String timeAgo = '';
+          if (updatedAt != null) {
+            final dt = DateTime.tryParse(updatedAt);
+            if (dt != null) {
+              final diff = DateTime.now().difference(dt.toLocal());
+              if (diff.inMinutes < 1) { timeAgo = 'just now'; }
+              else if (diff.inHours < 1) { timeAgo = '${diff.inMinutes}m ago'; }
+              else if (diff.inDays < 1) { timeAgo = '${diff.inHours}h ago'; }
+              else { timeAgo = '${diff.inDays}d ago'; }
+            }
           }
-          final remaining = status.reportsRemaining ?? 0;
-          final days = status.daysRemaining;
-          final isExpired = status.type == SubscriptionType.trialExpired;
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: isExpired
-                ? Colors.red[100]
-                : remaining <= 1
-                    ? Colors.orange[100]
-                    : Colors.blue[50],
-            child: Row(
-              children: [
-                Icon(
-                  isExpired ? Icons.block : Icons.info_outline,
-                  color: isExpired
-                      ? Colors.red
-                      : remaining <= 1 ? Colors.orange : Colors.blue,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    isExpired
-                        ? 'Trial ended - Upgrade to continue creating reports'
-                        : '$remaining reports left${days != null ? ' • $days days remaining' : ''}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: isExpired ? Colors.red[900] : null,
+          return Material(
+            color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.35),
+            child: InkWell(
+              onTap: () => Navigator.pushNamed(
+                context,
+                Paths.dynamicReport,
+                arguments: {'schemaId': schemaId, 'reportId': reportId},
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.history, size: 15,
+                        color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Continue: ${schemaId.replaceAll('_', ' ')}${timeAgo.isNotEmpty ? '  ·  $timeAgo' : ''}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
+                    Icon(Icons.chevron_right, size: 16,
+                        color: Theme.of(context).colorScheme.primary),
+                  ],
                 ),
-                ElevatedButton(
-                  onPressed: () => showUpgradeOptionsDialog(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isExpired ? Colors.red : Colors.blue,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Upgrade'),
-                ),
-              ],
+              ),
             ),
           );
         },
-        loading: () => const SizedBox.shrink(),
-        error: (_, __) => const SizedBox.shrink(),
-      ),
-      // Connectivity indicator — shows online/offline state.
-      // Tap "Offline Mode" in the drawer to manage sync settings.
-      SyncBanner(
-        isOnline: ref.watch(connectivityProvider).valueOrNull ?? true,
-        pendingCount: 0,
-        onTapSync: () => SyncService().syncForCurrentUser(),
       ),
           Expanded(
             child: Padding(
@@ -282,7 +366,6 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
               child: LayoutBuilder(
                 builder: (ctx, c) {
                   final isWide = c.maxWidth >= 1100;
-                  final isMedium = c.maxWidth >= 760;
     
                   // ---------- Overview KPIs ----------
                   final overview = _OverviewStrip(
@@ -320,41 +403,15 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
                     onNext: _next,
                   );
     
-                  if (isWide) {
-                    return ListView(
-                      children: [
-                        overview,
-                        const SizedBox(height: 16),
-                        schemaGrid,
-                        const SizedBox(height: 16),
-                        activityAlerts,
-                        const SizedBox(height: 16),
-                        queue,
-                      ],
-                    );
-                  }
-                  if (isMedium) {
-                    return ListView(
-                      children: [
-                        overview,
-                        const SizedBox(height: 12),
-                        schemaGrid,
-                        const SizedBox(height: 12),
-                        activityAlerts,
-                        const SizedBox(height: 12),
-                        queue,
-                      ],
-                    );
-                  }
-                  // narrow
+                  final gap = isWide ? 16.0 : 12.0;
                   return ListView(
                     children: [
                       overview,
-                      const SizedBox(height: 12),
+                      SizedBox(height: gap),
                       schemaGrid,
-                      const SizedBox(height: 12),
+                      SizedBox(height: gap),
                       activityAlerts,
-                      const SizedBox(height: 12),
+                      SizedBox(height: gap),
                       queue,
                     ],
                   );
@@ -364,6 +421,51 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
           ),
         ],
       ),
+    ),
+    floatingActionButton: FloatingActionButton.small(
+      onPressed: () => Navigator.pushNamed(context, Paths.createProject),
+      tooltip: 'New Project',
+      child: const Icon(Icons.create_new_folder_outlined),
+    ),
+    bottomNavigationBar: NavigationBar(
+      selectedIndex: _navIndex,
+      labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+      onDestinationSelected: (i) {
+        setState(() => _navIndex = i);
+        switch (i) {
+          case 0:
+            break; // stay on dashboard
+          case 1:
+            Navigator.pushNamed(context, Paths.projects);
+          case 2:
+            Navigator.pushNamed(context, Paths.visualizationHome);
+          case 3:
+            Navigator.pushNamed(context, Paths.chat);
+        }
+        if (i != 0) setState(() => _navIndex = 0);
+      },
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home),
+          label: 'Home',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.folder_outlined),
+          selectedIcon: Icon(Icons.folder),
+          label: 'Projects',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.bar_chart_outlined),
+          selectedIcon: Icon(Icons.bar_chart),
+          label: 'KPIs',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.chat_outlined),
+          selectedIcon: Icon(Icons.chat),
+          label: 'Team',
+        ),
+      ],
     ),
     );
   }
@@ -394,20 +496,36 @@ class _MainDrawer extends StatelessWidget {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
+            // ── Header ─────────────────────────────────────────────────────
             DrawerHeader(
               margin: EdgeInsets.zero,
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: Row(
                 children: [
+                  Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.architecture,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('WeldQAi', style: Theme.of(context).textTheme.titleLarge),
+                        Text('WeldQAi',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
-                        Text(userName, style: Theme.of(context).textTheme.bodySmall),
+                        Text(userName,
+                            style: Theme.of(context).textTheme.bodySmall,
+                            overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   ),
@@ -415,55 +533,116 @@ class _MainDrawer extends StatelessWidget {
               ),
             ),
 
-            ListTile(
-              leading: const Icon(Icons.dashboard_outlined),
-              title: const Text('Dashboard'),
-              onTap: () => _go(context, Paths.dashboard),
-            ),
-            ListTile(
-              leading: const Icon(Icons.description_outlined),
-              title: const Text('QC Reports'),
-              onTap: () => _go(context, Paths.qcCatalog),
-            ),
-            ListTile(
-              leading: const Icon(Icons.bar_chart_outlined),
-              title: const Text('Visualization'),
-              onTap: () => _go(context, Paths.visualizationHome),
-            ),
-            ListTile(
-              leading: const Icon(Icons.chat_bubble_outline),
-              title: const Text('Chat'),
-              onTap: () => _go(context, Paths.chat),
-            ),
+            // ── WORKSPACE ──────────────────────────────────────────────────
+            _DrawerSection(label: 'WORKSPACE', children: [
+              ListTile(
+                leading: const Icon(Icons.home_outlined),
+                title: const Text('Dashboard'),
+                onTap: () => _go(context, Paths.dashboard),
+              ),
+              ListTile(
+                leading: const Icon(Icons.folder_outlined),
+                title: const Text('Projects'),
+                onTap: () => _go(context, Paths.projects),
+              ),
+            ]),
 
-            ListTile(
-              leading: const Icon(Icons.wifi_outlined),
-              title: const Text('Offline Mode'),
-              onTap: () => _go(context, Paths.offline),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.settings_outlined),
-              title: const Text('Account Settings'),
-              onTap: () => _go(context, Paths.accountSettings),
-            ),
+            // ── REPORTS ────────────────────────────────────────────────────
+            // New inspections start inside a Project (project-first flow).
+            // This entry is read-only reference to browse existing reports.
+            _DrawerSection(label: 'REPORTS', children: [
+              ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: const Text('All Inspections'),
+                subtitle: const Text('Browse reports across all schemas'),
+                onTap: () => _go(context, Paths.qcCatalog),
+              ),
+            ]),
 
+            // ── ANALYTICS ──────────────────────────────────────────────────
+            _DrawerSection(label: 'ANALYTICS', children: [
+              ListTile(
+                leading: const Icon(Icons.bar_chart_outlined),
+                title: const Text('KPI Dashboard'),
+                onTap: () => _go(context, Paths.visualizationHome),
+              ),
+            ]),
+
+            // ── TEAM ───────────────────────────────────────────────────────
+            _DrawerSection(label: 'TEAM', children: [
+              ListTile(
+                leading: const Icon(Icons.chat_bubble_outline),
+                title: const Text('Chat'),
+                onTap: () => _go(context, Paths.chat),
+              ),
+              ListTile(
+                leading: const Icon(Icons.group_add_outlined),
+                title: const Text('Share Access'),
+                onTap: () => _go(context, Paths.collaboration),
+              ),
+            ]),
+
+            // ── SETTINGS ───────────────────────────────────────────────────
+            _DrawerSection(label: 'SETTINGS', children: [
+              ListTile(
+                leading: const Icon(Icons.wifi_outlined),
+                title: const Text('Offline & Sync'),
+                onTap: () => _go(context, Paths.offline),
+              ),
+              ListTile(
+                leading: const Icon(Icons.manage_accounts_outlined),
+                title: const Text('Account Settings'),
+                onTap: () => _go(context, Paths.accountSettings),
+              ),
+            ]),
+
+            const Divider(height: 24),
+
+            // ── Sign out ───────────────────────────────────────────────────
             ListTile(
-  leading: const Icon(Icons.exit_to_app),
-  title: const Text('Sign out'),
-  onTap: () {
-    // Reset workspace before signing out
-    context.read<WorkspaceProvider>().reset();
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      Paths.welcome,
-      (r) => false,
-    );
-  },
-),
+              leading: const Icon(Icons.exit_to_app),
+              title: const Text('Sign out'),
+              onTap: () {
+                context.read<WorkspaceProvider>().reset();
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  Paths.welcome,
+                  (r) => false,
+                );
+              },
+            ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Draws a labelled section header followed by its list tiles.
+class _DrawerSection extends StatelessWidget {
+  const _DrawerSection({required this.label, required this.children});
+  final String label;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.w700,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+        ...children,
+      ],
     );
   }
 }
@@ -586,11 +765,19 @@ class _SchemaGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    void go(String schemaId, String schemaTitle) =>
+        Navigator.pushNamed(context, Paths.dynamicReport,
+            arguments: {'schemaId': schemaId, 'schemaTitle': schemaTitle});
+
     final tiles = <Widget>[
-      _SchemaTile(title: 'Welding',           loader: loadWeldingKpis, stream: weldingKpisS),
-      _SchemaTile(title: 'Visual Inspection', loader: loadVisualKpis,  stream: visualKpisS),
-      _SchemaTile(title: 'NDT',               loader: loadNdtKpis,     stream: ndtKpisS),
-      _SchemaTile(title: 'Repairs',           loader: loadRepairsKpis, stream: repairsKpisS),
+      _SchemaTile(title: 'Welding',           loader: loadWeldingKpis, stream: weldingKpisS,
+          onTap: () => go('welding_operation',  'Welding Operation')),
+      _SchemaTile(title: 'Visual Inspection', loader: loadVisualKpis,  stream: visualKpisS,
+          onTap: () => go('visual_inspection', 'Visual Inspection')),
+      _SchemaTile(title: 'NDT',               loader: loadNdtKpis,     stream: ndtKpisS,
+          onTap: () => go('ndt_rt',            'NDT (RT)')),
+      _SchemaTile(title: 'Repairs',           loader: loadRepairsKpis, stream: repairsKpisS,
+          onTap: () => go('repairs',           'Repairs')),
     ];
 
     return LayoutBuilder(
@@ -611,10 +798,16 @@ class _SchemaGrid extends StatelessWidget {
 }
 
 class _SchemaTile extends StatelessWidget {
-  const _SchemaTile({required this.title, required this.loader, this.stream});
+  const _SchemaTile({
+    required this.title,
+    required this.loader,
+    this.stream,
+    this.onTap,
+  });
   final String title;
   final Future<Map<String, dynamic>> Function() loader;
   final Stream<Map<String, dynamic>>? stream;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -626,7 +819,7 @@ class _SchemaTile extends StatelessWidget {
             return const _CardShell(child: Center(child: CircularProgressIndicator()));
           }
           final m = s.data ?? const <String, dynamic>{};
-          return _tileBody(title, m);
+          return _tileBody(title, m, onTap);
         },
       );
     }
@@ -638,17 +831,16 @@ class _SchemaTile extends StatelessWidget {
           return const _CardShell(child: Center(child: CircularProgressIndicator()));
         }
         final m = s.data ?? const <String, dynamic>{};
-        return _tileBody(title, m);
+        return _tileBody(title, m, onTap);
       },
     );
   }
 
-Widget _tileBody(String title, Map<String, dynamic> m) {
+Widget _tileBody(String title, Map<String, dynamic> m, VoidCallback? onTap) {
   final rows = m.keys.toList()..sort();
-  
-  // Define colors per section
-  Color getAccentColor(String title) {
-    switch (title) {
+
+  Color getAccentColor(String t) {
+    switch (t) {
       case 'Welding': return Colors.blue;
       case 'Visual Inspection': return Colors.orange;
       case 'NDT': return Colors.purple;
@@ -656,40 +848,52 @@ Widget _tileBody(String title, Map<String, dynamic> m) {
       default: return Colors.grey;
     }
   }
-  
+
   return Card(
     margin: const EdgeInsets.all(8),
-    child: Container(
-      decoration: BoxDecoration(
-        border: Border(
-          left: BorderSide(color: getAccentColor(title), width: 4),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: getAccentColor(title), width: 4),
+          ),
+          borderRadius: BorderRadius.circular(12),
         ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 8, bottom: 8),
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 8, bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if (onTap != null)
+                    const Icon(Icons.chevron_right, size: 16),
+                ],
               ),
             ),
-          ),
-          for (final k in rows.take(4))
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-              child: _kv(k, _formatNum(m[k])),
+            for (final k in rows.take(4))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                child: _kv(k, _formatNum(m[k])),
+              ),
+            if (rows.isEmpty) const Padding(
+              padding: EdgeInsets.all(8),
+              child: Text('No data'),
             ),
-          if (rows.isEmpty) const Padding(
-            padding: EdgeInsets.all(8),
-            child: Text('No data'),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );

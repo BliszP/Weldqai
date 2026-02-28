@@ -159,6 +159,26 @@ service cloud.firestore {
     }
 
     // ============================================================================
+    // PROJECTS
+    // Owner can create/read/update/delete their projects.
+    // Collaborators with "read" permission can list and view projects when
+    // browsing a shared workspace. Collaborators with "write" can update
+    // (e.g. reportCount denormalised field incremented server-side).
+    // ============================================================================
+    match /users/{userId}/projects/{projectId} {
+      allow read: if isOwner(userId) || isCollaborator(userId, "read");
+      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+    }
+
+    // ============================================================================
+    // NOTIFICATIONS
+    // ============================================================================
+    match /users/{userId}/notifications/{notifId} {
+      allow read, delete: if isOwner(userId);
+      allow create: if isAuthenticated();
+    }
+
+    // ============================================================================
     // CUSTOM SCHEMAS & TEMPLATES
     // templates used by SyncService offline hydration
     // ============================================================================

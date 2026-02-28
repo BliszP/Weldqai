@@ -10,12 +10,14 @@ import 'package:weldqai_app/features/reports/widgets/template_upload_button.dart
 import 'package:weldqai_app/screens/field_mapping_screen.dart';
 import 'package:weldqai_app/core/models/template_mapping.dart';
 class ReportCatalogScreen extends StatefulWidget {
-  final String userId;  // ✅ Add this field
-  
   const ReportCatalogScreen({
-    super.key, 
-    required this.userId,  // ✅ Store it in the field
+    super.key,
+    required this.userId,
+    this.projectId,
   });
+
+  final String userId;
+  final String? projectId;
 
   @override
   State<ReportCatalogScreen> createState() => _ReportCatalogScreenState();
@@ -123,7 +125,8 @@ class _ReportCatalogScreenState extends State<ReportCatalogScreen> {
       arguments: {
         'schemaId': e.id,
         'schemaTitle': e.title,
-        'userId': widget.userId,  // ✅ Use workspace instead of current user
+        'userId': widget.userId,
+        if (widget.projectId != null) 'projectId': widget.projectId!,
       },
     );
     
@@ -786,22 +789,29 @@ class _ReportCatalogScreenState extends State<ReportCatalogScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
               children: [
-                if (builtIn.isNotEmpty) ...[
-                  const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: Text('Built-in Reports',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                if (builtIn.isNotEmpty)
+                  Card(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    clipBehavior: Clip.antiAlias,
+                    child: ExpansionTile(
+                      leading: const Icon(Icons.inventory_2_outlined),
+                      title: const Text('Built-in Reports',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text('${builtIn.length} templates — tap to expand'),
+                      initiallyExpanded: false,
+                      childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                      children: builtIn.map((e) => Card(
+                            margin: const EdgeInsets.symmetric(vertical: 2),
+                            child: ListTile(
+                              leading: const Icon(Icons.description_outlined),
+                              title: Text(e.title),
+                              subtitle: Text(e.id),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => _openSchema(e),
+                            ),
+                          )).toList(),
+                    ),
                   ),
-                  ...builtIn.map((e) => Card(
-                        child: ListTile(
-                          leading: const Icon(Icons.description_outlined),
-                          title: Text(e.title),
-                          subtitle: Text(e.id),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () => _openSchema(e),
-                        ),
-                      )),
-                ],
                 if (custom.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   const Divider(),

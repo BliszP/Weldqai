@@ -23,11 +23,13 @@ class TemplateUploadButton extends StatefulWidget {
     this.onSchemaGenerated,
     this.heroTag,
     this.debug = false,
+    this.projectId,
   });
 
   final VoidCallback? onSchemaGenerated;
   final Object? heroTag;
   final bool debug;
+  final String? projectId;
 
   @override
   State<TemplateUploadButton> createState() => _TemplateUploadButtonState();
@@ -230,7 +232,8 @@ class _TemplateUploadButtonState extends State<TemplateUploadButton> {
             'schemaId': savedId,
             'schemaTitle': mappedTemplate.name,
             'userId': uid,
-            'reportId': null,  // ✅ CHANGED: null = new report, user fills it themselves
+            'reportId': null,
+            if (widget.projectId != null) 'projectId': widget.projectId!,
           },
         );
 

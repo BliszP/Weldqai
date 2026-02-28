@@ -23,6 +23,7 @@ class MultiReportAccordion extends StatefulWidget {
     this.scanService,
     this.repo,
     this.reportId,
+    this.projectId,
   });
 
   final String userId; // CHANGED
@@ -33,6 +34,7 @@ class MultiReportAccordion extends StatefulWidget {
   final ScanService? scanService;
   final ReportRepository? repo;
   final String? reportId; // ✅ FIX: This was "get reportId => null;" - now it's a proper field
+  final String? projectId; // optional project context — stored on every saved item
 
   @override
   State<MultiReportAccordion> createState() => _MultiReportAccordionState();
@@ -285,7 +287,11 @@ Future<void> _saveAll() async {
     final id = await repo.saveReport(
       userId: widget.userId,
       schemaId: widget.reportType,
-      payload: {'details': s.details, 'rows': s.rows},
+      payload: {
+        'details': s.details,
+        'rows': s.rows,
+        if (widget.projectId != null) 'projectId': widget.projectId!,
+      },
       reportId: p.itemId,
       skipSubscriptionCheck: p.skipSubscriptionCheck,  // ✅ NEW: Pass the flag
     );
