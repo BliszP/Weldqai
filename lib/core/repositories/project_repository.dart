@@ -173,6 +173,42 @@ class ProjectRepository {
     }
   }
 
+  /// Atomically increments per-type report counts inside the project document
+  /// under a `typeStats` map field.
+  ///   typeStats.{schemaId}: int  (e.g. typeStats.welding_operation: 4)
+  ///
+  /// Silently swallows errors — same fire-and-forget contract as
+  /// [incrementReportCount].
+  Future<void> incrementTypeStats(
+    String userId,
+    String projectId,
+    String schemaId,
+  ) async {
+    try {
+      await _col(userId).doc(projectId).update({
+        'typeStats.$schemaId': FieldValue.increment(1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      AppLogger.debug('✅ Project $projectId typeStats.$schemaId incremented');
+    } catch (e) {
+      AppLogger.warning(
+          '⚠️ Could not increment typeStats for $projectId/$schemaId: $e');
+    }
+  }
+
+  /// Live stream of per-type report counts for a project.
+  /// Emits a `Map<String, int>` keyed by schemaId, e.g.
+  ///   {'welding_operation': 4, 'ndt_rt': 2}
+  Stream<Map<String, int>> watchTypeStats(String userId, String projectId) {
+    return _col(userId).doc(projectId).snapshots().map((snap) {
+      if (!snap.exists) return const <String, int>{};
+      final raw = (snap.data() ?? const <String, dynamic>{})['typeStats'];
+      if (raw is! Map) return const <String, int>{};
+      return raw.map((k, v) =>
+          MapEntry(k.toString(), (v as num?)?.toInt() ?? 0));
+    });
+  }
+
   /// Permanently deletes a project document.
   Future<void> deleteProject(String userId, String projectId) async {
     try {

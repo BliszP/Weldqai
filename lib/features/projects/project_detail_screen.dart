@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:weldqai_app/app/constants/paths.dart';
+import 'package:weldqai_app/core/design/app_tokens.dart';
 import 'package:weldqai_app/core/repositories/project_repository.dart';
 import 'package:weldqai_app/core/services/logger_service.dart';
 import 'package:weldqai_app/features/projects/create_project_screen.dart';
@@ -328,6 +329,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
           const SizedBox(height: 16),
 
+          // ── Per-type stats ───────────────────────────────────────────────
+          _TypeStatsSection(
+            userId: widget.userId,
+            projectId: widget.projectId,
+          ),
+
+          const SizedBox(height: 16),
+
           // ── Start Inspection ─────────────────────────────────────────────
           _SectionCard(
             child: ListTile(
@@ -381,6 +390,133 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 Paths.qcCatalog,
                 arguments: {'projectId': widget.projectId},
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Per-type stats section ────────────────────────────────────────────────────
+
+/// Reads the `typeStats` map from the project document and renders one row per
+/// inspection category that has been used.  Hidden when no stats yet exist.
+class _TypeStatsSection extends StatelessWidget {
+  const _TypeStatsSection({
+    required this.userId,
+    required this.projectId,
+  });
+
+  final String userId;
+  final String projectId;
+
+  static const _labels = {
+    'welding_operation': 'Welding',
+    'visual_inspection': 'Visual Inspection',
+    'ndt_rt':            'NDT (RT)',
+    'ndt_ut':            'NDT (UT)',
+    'ndt_mpi':           'NDT (MPI)',
+    'structural_fillet': 'Structural / Fillet',
+    'repairs':           'Repairs',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Map<String, int>>(
+      stream: ProjectRepository().watchTypeStats(userId, projectId),
+      builder: (context, snap) {
+        final stats = snap.data ?? const <String, int>{};
+        final entries = stats.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value)); // highest first
+
+        if (entries.isEmpty) return const SizedBox.shrink();
+
+        return _SectionCard(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.bar_chart_outlined,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Inspections by Type',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                for (final e in entries)
+                  _TypeStatRow(
+                    label: _labels[e.key] ?? e.key.replaceAll('_', ' '),
+                    count: e.value,
+                    total: stats.values.fold(0, (a, b) => a + b),
+                    color: AppTokens.categoryColor(
+                      e.key.contains('ndt')        ? 'ndt'
+                      : e.key.contains('weld')     ? 'welding'
+                      : e.key.contains('visual')   ? 'welding'
+                      : e.key.contains('repair')   ? 'welding'
+                      : e.key.contains('struct')   ? 'structural'
+                      : 'welding',
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TypeStatRow extends StatelessWidget {
+  const _TypeStatRow({
+    required this.label,
+    required this.count,
+    required this.total,
+    required this.color,
+  });
+
+  final String label;
+  final int count;
+  final int total;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final fraction = total > 0 ? count / total : 0.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(label,
+                    style: const TextStyle(fontSize: 13),
+                    overflow: TextOverflow.ellipsis),
+              ),
+              Text('$count',
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: fraction,
+              minHeight: 6,
+              backgroundColor: color.withValues(alpha: 0.12),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
         ],

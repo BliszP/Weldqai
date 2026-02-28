@@ -188,12 +188,13 @@ if (isNewReport && !skipSubscriptionCheck) {  // ✅ ADDED && !skipSubscriptionC
   await _subscriptionService.trackReportCreation();
 }
 
-    // Increment denormalised reportCount on the linked project (fire-and-forget;
-    // errors are swallowed inside incrementReportCount so they never block saves).
+    // Increment denormalised reportCount and per-type stats on the linked project
+    // (fire-and-forget; errors are swallowed so they never block saves).
     if (isNewReport) {
       final projectId = payload['projectId'] as String?;
       if (projectId != null && projectId.isNotEmpty) {
         await ProjectRepository().incrementReportCount(uid, projectId);
+        await ProjectRepository().incrementTypeStats(uid, projectId, schemaId);
       }
     }
 

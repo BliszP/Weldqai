@@ -14,6 +14,7 @@ import 'package:weldqai_app/core/services/subscription_service.dart';
 import 'package:weldqai_app/features/account/widgets/upgrade_options_dialog.dart';
 import 'package:weldqai_app/core/providers/connectivity_provider.dart';
 import 'package:weldqai_app/core/repositories/report_repository.dart';
+import 'package:weldqai_app/features/offline/widgets/sync_banner.dart';
 
 
 /// ---------- Loader typedefs (Futures required; Streams optional) ----------
@@ -159,9 +160,14 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isOnline = ref.watch(connectivityProvider).valueOrNull ?? true;
+
     return Scaffold(
       drawer: _MainDrawer(userId: widget.userId, userName: widget.title),
       appBar: AppBar(
+  bottom: isOnline
+      ? null
+      : SyncBanner(isOnline: false, pendingCount: 0),
   title: Consumer<WorkspaceProvider>(
     builder: (context, workspace, _) {
       if (workspace.isViewingOwnWorkspace) {
@@ -208,19 +214,15 @@ class _ProjectDashboardScreenState extends ConsumerState<ProjectDashboardScreen>
     // Compact connectivity dot
     Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: ref.watch(connectivityProvider).when(
-        data: (online) => Tooltip(
-          message: online ? 'Online' : 'Offline — changes will sync',
-          child: Container(
-            width: 8, height: 8,
-            decoration: BoxDecoration(
-              color: online ? Colors.green : Colors.orange,
-              shape: BoxShape.circle,
-            ),
+      child: Tooltip(
+        message: isOnline ? 'Online' : 'Offline — changes will sync',
+        child: Container(
+          width: 8, height: 8,
+          decoration: BoxDecoration(
+            color: isOnline ? Colors.green : Colors.orange,
+            shape: BoxShape.circle,
           ),
         ),
-        loading: () => const SizedBox(width: 8, height: 8),
-        error: (_, __) => const SizedBox(width: 8, height: 8),
       ),
     ),
     // Trial status chip — only shown during trial/expired
