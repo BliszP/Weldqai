@@ -76,9 +76,19 @@ service cloud.firestore {
     // ============================================================================
     // REPORTS, KPIs, VISUALIZATIONS, STATS, ALERTS
     // ============================================================================
+
+    // Report items under /users/{uid}/reports/{schemaId}/items/{itemId}.
+    // Once a report is locked (lockedAt field set), updates are blocked — only
+    // deletes remain allowed (for admin cleanup).  Creates are always allowed
+    // for the owner/collaborator.  The wildcard also covers the schema-level
+    // metadata documents (no lockedAt field → update allowed).
     match /users/{userId}/reports/{document=**} {
-      allow read: if isOwner(userId) || isCollaborator(userId, "read");
-      allow write: if isOwner(userId) || isCollaborator(userId, "write");
+      allow read:   if isOwner(userId) || isCollaborator(userId, "read");
+      allow create: if isOwner(userId) || isCollaborator(userId, "write");
+      allow update: if (isOwner(userId) || isCollaborator(userId, "write"))
+                    && !('lockedAt' in resource.data
+                         && resource.data.lockedAt != null);
+      allow delete: if isOwner(userId);
     }
 
     match /users/{userId}/kpis/{document=**} {
@@ -261,6 +271,15 @@ service cloud.firestore {
     match /contact_messages/{messageId} {
       allow create: if isAuthenticated();
       allow read, update, delete: if false;
+    }
+
+    // ============================================================================
+    // AUDIT LOG — immutable; create only, never update or delete
+    // ============================================================================
+    match /users/{userId}/audit_log/{logId} {
+      allow read:          if isOwner(userId);
+      allow create:        if isOwner(userId) || isCollaborator(userId, "write");
+      allow update, delete: if false; // Immutable — audit entries cannot be modified
     }
 
     // ============================================================================

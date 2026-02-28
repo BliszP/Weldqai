@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';  // ✅ ADD THIS LINE
 import 'package:weldqai_app/core/repositories/project_repository.dart';
 import 'package:weldqai_app/core/services/analytics_service.dart';
+import 'package:weldqai_app/core/services/audit_log_service.dart';
 import 'package:weldqai_app/core/services/subscription_service.dart';
 import 'package:weldqai_app/core/services/logger_service.dart';
 
@@ -196,11 +197,51 @@ if (isNewReport && !skipSubscriptionCheck) {  // ✅ ADDED && !skipSubscriptionC
       }
     }
 
+    // Audit log (fire-and-forget — never blocks the save).
+    if (isNewReport) {
+      await AuditLogService().logReportCreate(uid, id,
+          schemaId: schemaId,
+          projectId: payload['projectId'] as String?);
+    } else {
+      await AuditLogService().logReportUpdate(uid, id, schemaId: schemaId);
+    }
+
     return id;
   }
 
-// Add this to report_repository.dart
-// Replace the existing deleteItem method with this enhanced version
+  // ---------------------------------------------------------------------------
+  // Report lock
+  // ---------------------------------------------------------------------------
+
+  /// Marks a report as submitted/locked. Once locked, Firestore rules prevent
+  /// further updates from the client. The lock is also recorded in the audit log.
+  ///
+  /// Pass [certNumber] and [certBody] to stamp the inspector's credential on
+  /// the report document (used by export_service when generating PDFs).
+  Future<void> lockReport({
+    required String userId,
+    required String schemaId,
+    required String reportId,
+    String? certNumber,
+    String? certBody,
+  }) async {
+    final uid = _requireUid(userId);
+    final ref = _itemsCol(uid, schemaId).doc(reportId);
+
+    await ref.update({
+      'lockedAt':    FieldValue.serverTimestamp(),
+      'lockedBy':    _auth.currentUser?.uid,
+      'lockedByEmail': _auth.currentUser?.email,
+      'reportStatus': 'submitted',
+      if (certNumber != null && certNumber.isNotEmpty) 'certNumber': certNumber,
+      if (certBody   != null && certBody.isNotEmpty)   'certBody':   certBody,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    AppLogger.info('🔒 Report locked: $reportId (schema: $schemaId)');
+
+    await AuditLogService().logReportLock(uid, reportId, schemaId: schemaId);
+  }
 
 /// Delete one saved item (and clean up rollups + photos + signatures + aux collections).
 Future<void> deleteItem({
@@ -236,6 +277,9 @@ Future<void> deleteItem({
     schemaId: schemaId,
     reportId: itemId,
   );
+
+  // 6. Audit log (fire-and-forget).
+  await AuditLogService().logReportDelete(uid, itemId, schemaId: schemaId);
 }
 
 /// Delete all photos for a report from Firebase Storage
